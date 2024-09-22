@@ -1,0 +1,9 @@
+services:
+  app:
+    build: .
+    command: ./main
+    environment:
+      TELEGRAM_HTTP_API_TOKEN: ${TELEGRAM_HTTP_API_TOKEN}
+      BOT_NAME: ${BOT_NAME}
+      ALLOWED_CHATS: ${ALLOWED_CHATS}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
