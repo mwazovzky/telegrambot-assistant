@@ -7,3 +7,12 @@ services:
       BOT_NAME: ${BOT_NAME}
       ALLOWED_CHATS: ${ALLOWED_CHATS}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+  redis:
+    image: redis:7.4.0-alpine
+    ports:
+      - 6379:6379
+    command: redis-server --requirepass ${REDIS_PASSWORD}
