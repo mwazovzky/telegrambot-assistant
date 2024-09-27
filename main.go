@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -8,10 +9,13 @@ import (
 	"strconv"
 	"strings"
 	"telegrambot-assistant/services/repository"
+	"telegrambot-assistant/services/storage"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	openai "github.com/mwazovzky/assistant"
 	openaiclient "github.com/mwazovzky/assistant/http/client"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -24,38 +28,44 @@ func main() {
 	updates := bot.GetUpdatesChan(u)
 
 	for update := range updates {
-		if update.Message != nil {
-			msg := update.Message
-			log.Printf("Incoming message: chat_id: %d, from_user: %s, text: %s\n", msg.Chat.ID, msg.From.UserName, msg.Text)
-
-			if !isValidChat(msg.Chat.ID) {
-				continue
-			}
-
-			req, err := parseRequest(msg.Text, botName)
-			if err != nil {
-				log.Println("error", err)
-				continue
-			}
-
-			res, err := getResponse(ai, req, msg.From.UserName)
-			if err != nil {
-				log.Println("error", err)
-				continue
-			}
-
-			sendResponse(bot, msg.Chat.ID, msg.MessageID, res)
-			log.Printf("Outgoing message: chat_id: %d, reply_to_message_id: %d, text: %s", msg.Chat.ID, msg.MessageID, res)
+		if update.Message == nil {
+			continue
 		}
+
+		msg := update.Message
+		log.Printf("Incoming message: chat_id: %d, from_user: %s, text: %s\n", msg.Chat.ID, msg.From.UserName, msg.Text)
+
+		if !isValidChat(msg.Chat.ID) {
+			continue
+		}
+
+		req, err := parseRequest(msg.Text, botName)
+		if err != nil {
+			log.Println("error", err)
+			continue
+		}
+
+		res, err := getResponse(ai, req, msg.From.UserName)
+		if err != nil {
+			log.Println("error", err)
+			continue
+		}
+
+		sendResponse(bot, msg.Chat.ID, msg.MessageID, res)
+		log.Printf("Outgoing message: chat_id: %d, reply_to_message_id: %d, text: %s", msg.Chat.ID, msg.MessageID, res)
 	}
 }
 
 func initAssistant(name string) *openai.Assistant {
+	role := fmt.Sprintf("You are assistant. Your name is %s", name)
+
 	url := "https://api.openai.com/v1/chat/completions"
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	client := openaiclient.NewOpenAiClient(url, apiKey)
-	tr := repository.NewThreadRepository()
-	role := fmt.Sprintf("You are assistant. Your name is %s", name)
+
+	r := initRedis()
+	s := initStorage(r)
+	tr := repository.NewCachedRepository(s)
 
 	return openai.NewAssistant(role, client, tr)
 }
@@ -73,6 +83,39 @@ func initBot() *tgbotapi.BotAPI {
 	return bot
 }
 
+func initStorage(r *redis.Client) *storage.RedisService {
+	ets := os.Getenv("EXPIRATION_TIME")
+	et, err := strconv.Atoi(ets)
+	if err != nil {
+		log.Fatal("can not load config, error", err)
+	}
+	ttl := time.Duration(et) * time.Second
+	return storage.NewRedisService(r, ttl)
+}
+
+func initRedis() *redis.Client {
+	host := os.Getenv("REDIS_HOST")
+	port := os.Getenv("REDIS_PORT")
+	pwd := os.Getenv("REDIS_PASSWORD")
+	adr := fmt.Sprintf("%s:%s", host, port)
+
+	client := redis.NewClient(&redis.Options{
+		Addr:     adr,
+		Password: pwd,
+		DB:       0,
+	})
+
+	ctx := context.Background()
+	str, err := client.Ping(ctx).Result()
+	if err != nil {
+		log.Fatal("ERROR", err)
+	}
+
+	log.Println("Connected to redis", str)
+
+	return client
+}
+
 func parseRequest(txt string, botName string) (string, error) {
 	if !strings.HasPrefix(txt, botName) {
 		return "", fmt.Errorf("can not process request")
@@ -85,6 +128,7 @@ func parseRequest(txt string, botName string) (string, error) {
 
 func getResponse(ai *openai.Assistant, req string, username string) (string, error) {
 	_, err := ai.GetThread(username)
+
 	if err != nil {
 		err = ai.CreateThread(username)
 		if err != nil {
