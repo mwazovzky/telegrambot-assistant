@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"slices"
 	"strconv"
 	"strings"
+	"telegrambot-assistant/services/parser"
 	"telegrambot-assistant/services/repository"
 	"telegrambot-assistant/services/storage"
 	"time"
@@ -22,24 +22,21 @@ func main() {
 	botName := os.Getenv("BOT_NAME")
 	bot := initBot()
 	ai := initAssistant(botName)
+	p := initParser()
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 	updates := bot.GetUpdatesChan(u)
 
 	for update := range updates {
-		if update.Message == nil {
+		msg := update.Message
+		if msg == nil {
 			continue
 		}
 
-		msg := update.Message
 		log.Printf("Incoming message: chat_id: %d, from_user: %s, text: %s\n", msg.Chat.ID, msg.From.UserName, msg.Text)
 
-		if !isValidChat(msg.Chat.ID) {
-			continue
-		}
-
-		req, err := parseRequest(msg.Text, botName)
+		req, err := p.Parse(msg.Chat.ID, msg.Text)
 		if err != nil {
 			log.Println("error", err)
 			continue
@@ -52,6 +49,7 @@ func main() {
 		}
 
 		sendResponse(bot, msg.Chat.ID, msg.MessageID, res)
+
 		log.Printf("Outgoing message: chat_id: %d, reply_to_message_id: %d, text: %s", msg.Chat.ID, msg.MessageID, res)
 	}
 }
@@ -84,7 +82,7 @@ func initBot() *tgbotapi.BotAPI {
 }
 
 func initStorage(r *redis.Client) *storage.RedisService {
-	ets := os.Getenv("EXPIRATION_TIME")
+	ets := os.Getenv("REDIS_EXPIRATION_TIME")
 	et, err := strconv.Atoi(ets)
 	if err != nil {
 		log.Fatal("can not load config, error", err)
@@ -116,14 +114,29 @@ func initRedis() *redis.Client {
 	return client
 }
 
-func parseRequest(txt string, botName string) (string, error) {
-	if !strings.HasPrefix(txt, botName) {
-		return "", fmt.Errorf("can not process request")
+func initParser() *parser.Parser {
+	botName := os.Getenv("BOT_NAME")
+	if botName == "" {
+		log.Fatal("config err, bot name empty")
 	}
 
-	trimmedSymbols := "!, "
+	botChatID := os.Getenv("BOT_CHAT_ID")
+	botChat, err := strconv.ParseInt(botChatID, 10, 64)
+	if err != nil {
+		log.Fatal("config err", err)
+	}
 
-	return strings.TrimLeft(strings.TrimPrefix(txt, botName), trimmedSymbols), nil
+	chats := os.Getenv("ASSIGNED_CHATS")
+	assignedChats := []int64{}
+	for _, value := range strings.Split(chats, ",") {
+		chat, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			log.Fatal("config err", err)
+		}
+		assignedChats = append(assignedChats, chat)
+	}
+
+	return parser.NewParser(botName, botChat, assignedChats)
 }
 
 func getResponse(ai *openai.Assistant, req string, username string) (string, error) {
@@ -148,13 +161,4 @@ func sendResponse(bot *tgbotapi.BotAPI, chatID int64, messageID int, text string
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ReplyToMessageID = messageID
 	bot.Send(msg)
-}
-
-func isValidChat(chatID int64) bool {
-	return slices.Contains(getChats(), strconv.FormatInt(chatID, 10))
-}
-
-func getChats() []string {
-	chats := os.Getenv("ALLOWED_CHATS")
-	return strings.Split(chats, ",")
 }

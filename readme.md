@@ -11,3 +11,10 @@ export OPENAI_API_KEY={open-api-key}
 docker-compose build
 docker-compose up -d
 ```
+
+## Testing
+
+```
+go test ./... -v
+go test ./.../parser -v
+```
