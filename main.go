@@ -42,11 +42,15 @@ func main() {
 			continue
 		}
 
+		log.Printf("Parse, req: %s\n", req)
+
 		res, err := getResponse(ai, req, msg.From.UserName)
 		if err != nil {
 			log.Println("error", err)
 			continue
 		}
+
+		log.Printf("getResponse, res: %s\n", res)
 
 		sendResponse(bot, msg.Chat.ID, msg.MessageID, res)
 
@@ -96,6 +100,8 @@ func initRedis() *redis.Client {
 	port := os.Getenv("REDIS_PORT")
 	pwd := os.Getenv("REDIS_PASSWORD")
 	adr := fmt.Sprintf("%s:%s", host, port)
+
+	log.Println("Connecting", adr)
 
 	client := redis.NewClient(&redis.Options{
 		Addr:     adr,
