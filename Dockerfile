@@ -1,13 +1,11 @@
-FROM golang:1.23-alpine AS builder
+FROM golang:1.23-alpine AS build
 WORKDIR /app
-COPY go.mod .
-COPY go.sum .
+COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -o main .
+RUN go build -o main .
 
 FROM alpine:latest
-WORKDIR /app
-COPY --from=builder /app/main .
-
-CMD ["/app/main"]
+WORKDIR /root/
+COPY --from=build /app/main .
+CMD ["./main"]
