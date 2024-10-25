@@ -3,9 +3,10 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN go build -o main .
+RUN CSO_ENABLED=0 GOOS=linux go build -o main .
 
-FROM alpine:latest
+FROM scratch
 WORKDIR /root/
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=build /app/main .
 CMD ["./main"]
