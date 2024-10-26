@@ -18,3 +18,23 @@ docker-compose up -d
 go test ./... -v
 go test ./.../parser -v
 ```
+
+## Deploy
+
+Create image
+
+```
+docker build --platform=linux/amd64 -t mwazovzky/telegrambot-assistant .
+```
+
+Store image to docker hub
+
+```
+docker push mwazovzky/telegrambot-assistant
+```
+
+Start app
+
+```
+docker compose -f docker-compose.prod.yml up
+```

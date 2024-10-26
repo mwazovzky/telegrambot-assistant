@@ -1,0 +1,21 @@
+services:
+  app:
+    container_name: app
+    image: mwazovzky/telegrambot-assistant
+    environment:
+      TELEGRAM_HTTP_API_TOKEN: ${TELEGRAM_HTTP_API_TOKEN}
+      BOT_NAME: ${BOT_NAME}
+      BOT_CHAT_ID: ${BOT_CHAT_ID}
+      ASSIGNED_CHATS: ${ASSIGNED_CHATS}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_EXPIRATION_TIME: ${REDIS_EXPIRATION_TIME}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+
+  redis:
+    container_name: redis
+    image: redis:7.4.0-alpine
+    ports:
+      - 6379:6379
+    command: redis-server --requirepass ${REDIS_PASSWORD}
