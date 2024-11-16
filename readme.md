@@ -1,6 +1,8 @@
+![test](https://github.com/mwazovzky/telegrambot-assistant/actions/workflows/test.yml/badge.svg)
+
 # Telegram Bot Assistant
 
-## Start app
+## Dev
 
 ```
 export TELEGRAM_HTTP_API_TOKEN={bot-token}
