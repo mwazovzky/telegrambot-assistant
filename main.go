@@ -38,17 +38,22 @@ func main() {
 
 		req, err := p.Parse(msg.Chat.ID, msg.Text)
 		if err != nil {
-			log.Println("error", err)
+			log.Println("Parse error", err)
 			continue
 		}
 
 		res, err := getResponse(ai, req, msg.From.UserName)
 		if err != nil {
-			log.Println("error", err)
+			log.Println("getResponse error", err)
 			continue
 		}
 
-		sendResponse(bot, msg.Chat.ID, msg.MessageID, res)
+		err = sendResponse(bot, msg.Chat.ID, msg.MessageID, res)
+
+		if err != nil {
+			log.Println("sendResponse error", err)
+			continue
+		}
 
 		log.Printf("Outgoing message: chat_id: %d, reply_to_message_id: %d, text: %s", msg.Chat.ID, msg.MessageID, res)
 	}
@@ -76,7 +81,7 @@ func initBot() *tgbotapi.BotAPI {
 	}
 
 	// bot.Debug = true
-	log.Printf("Authorized on account %s", bot.Self.UserName)
+	log.Printf("TelegramBot: authorized on account %s", bot.Self.UserName)
 
 	return bot
 }
@@ -157,8 +162,9 @@ func getResponse(ai *openai.Assistant, req string, username string) (string, err
 	return res, nil
 }
 
-func sendResponse(bot *tgbotapi.BotAPI, chatID int64, messageID int, text string) {
+func sendResponse(bot *tgbotapi.BotAPI, chatID int64, messageID int, text string) error {
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ReplyToMessageID = messageID
-	bot.Send(msg)
+	_, err := bot.Send(msg)
+	return err
 }
