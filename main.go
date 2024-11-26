@@ -64,13 +64,14 @@ func initAssistant(name string) *openai.Assistant {
 
 	url := "https://api.openai.com/v1/chat/completions"
 	apiKey := os.Getenv("OPENAI_API_KEY")
+	model := os.Getenv("OPENAI_MODEL")
 	client := openaiclient.NewOpenAiClient(url, apiKey)
 
 	r := initRedis()
 	s := initStorage(r)
 	tr := repository.NewCachedRepository(s)
 
-	return openai.NewAssistant(role, client, tr)
+	return openai.NewAssistant(model, role, client, tr)
 }
 
 func initBot() *tgbotapi.BotAPI {

@@ -39,5 +39,7 @@ docker push mwazovzky/telegrambot-assistant
 Start app
 
 ```
-docker compose -f docker-compose.prod.yml up
+docker image rm {hash}
+docker compose pull
+docker compose -f docker-compose.prod.yml up -d
 ```

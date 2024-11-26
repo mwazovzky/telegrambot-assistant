@@ -12,6 +12,7 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       REDIS_EXPIRATION_TIME: ${REDIS_EXPIRATION_TIME}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL}
 
   redis:
     container_name: redis
