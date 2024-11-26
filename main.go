@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"strconv"
 	"strings"
+	"telegrambot-assistant/services/config"
 	"telegrambot-assistant/services/parser"
 	"telegrambot-assistant/services/repository"
 	"telegrambot-assistant/services/storage"
@@ -19,10 +19,14 @@ import (
 )
 
 func main() {
-	botName := os.Getenv("BOT_NAME")
-	bot := initBot()
-	ai := initAssistant(botName)
-	p := initParser()
+	cfg := config.Load()
+
+	r := initRedis(cfg.Redis)
+	s := initStorage(r, cfg.Redis.ExpirationTime)
+	tr := repository.NewCachedRepository(s)
+	ai := initAssistant(cfg.OpenAI, tr)
+	bot := initBot(cfg.Telegram)
+	p := initParser(cfg.Telegram)
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
@@ -59,24 +63,15 @@ func main() {
 	}
 }
 
-func initAssistant(name string) *openai.Assistant {
-	role := fmt.Sprintf("You are assistant. Your name is %s", name)
+func initAssistant(cfg config.OpenAIConfig, tr openai.TreadRepository) *openai.Assistant {
+	role := fmt.Sprintf("You are assistant. Your name is %s", cfg.Name)
+	client := openaiclient.NewOpenAiClient(cfg.ApiUrl, cfg.ApiKey)
 
-	url := "https://api.openai.com/v1/chat/completions"
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	model := os.Getenv("OPENAI_MODEL")
-	client := openaiclient.NewOpenAiClient(url, apiKey)
-
-	r := initRedis()
-	s := initStorage(r)
-	tr := repository.NewCachedRepository(s)
-
-	return openai.NewAssistant(model, role, client, tr)
+	return openai.NewAssistant(cfg.Model, role, client, tr)
 }
 
-func initBot() *tgbotapi.BotAPI {
-	botToken := os.Getenv("TELEGRAM_HTTP_API_TOKEN")
-	bot, err := tgbotapi.NewBotAPI(botToken)
+func initBot(cfg config.TelegramConfig) *tgbotapi.BotAPI {
+	bot, err := tgbotapi.NewBotAPI(cfg.ApiToken)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -87,8 +82,7 @@ func initBot() *tgbotapi.BotAPI {
 	return bot
 }
 
-func initStorage(r *redis.Client) *storage.RedisService {
-	ets := os.Getenv("REDIS_EXPIRATION_TIME")
+func initStorage(r *redis.Client, ets string) *storage.RedisService {
 	et, err := strconv.Atoi(ets)
 	if err != nil {
 		log.Fatal("can not load config, error", err)
@@ -97,10 +91,10 @@ func initStorage(r *redis.Client) *storage.RedisService {
 	return storage.NewRedisService(r, ttl)
 }
 
-func initRedis() *redis.Client {
-	host := os.Getenv("REDIS_HOST")
-	port := os.Getenv("REDIS_PORT")
-	pwd := os.Getenv("REDIS_PASSWORD")
+func initRedis(cfg config.RedisConfig) *redis.Client {
+	host := cfg.Host
+	port := cfg.Port
+	pwd := cfg.Password
 	adr := fmt.Sprintf("%s:%s", host, port)
 
 	client := redis.NewClient(&redis.Options{
@@ -120,29 +114,30 @@ func initRedis() *redis.Client {
 	return client
 }
 
-func initParser() *parser.Parser {
-	botName := os.Getenv("BOT_NAME")
+func initParser(cfg config.TelegramConfig) *parser.Parser {
+	botName := cfg.BotName
+	botChatID := cfg.ChatID
+	assignedChats := cfg.AssignedChats
+
 	if botName == "" {
 		log.Fatal("config err, bot name empty")
 	}
 
-	botChatID := os.Getenv("BOT_CHAT_ID")
 	botChat, err := strconv.ParseInt(botChatID, 10, 64)
 	if err != nil {
 		log.Fatal("config err", err)
 	}
 
-	chats := os.Getenv("ASSIGNED_CHATS")
-	assignedChats := []int64{}
-	for _, value := range strings.Split(chats, ",") {
+	chats := []int64{}
+	for _, value := range strings.Split(assignedChats, ",") {
 		chat, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
 			log.Fatal("config err", err)
 		}
-		assignedChats = append(assignedChats, chat)
+		chats = append(chats, chat)
 	}
 
-	return parser.NewParser(botName, botChat, assignedChats)
+	return parser.NewParser(botName, botChat, chats)
 }
 
 func getResponse(ai *openai.Assistant, req string, username string) (string, error) {
