@@ -14,7 +14,12 @@ services:
     env_file:
       - .env
     volumes:
-      - redis_data:/data 
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
 volumes:
   redis_data:
