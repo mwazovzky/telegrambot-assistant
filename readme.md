@@ -5,9 +5,11 @@
 
 ## Dev
 
-```
-docker-compose build
-docker-compose up -d
+```bash
+# set env variables
+export VAR_NAME=VAR_VALUE
+docker compose build
+docker compose up -d
 ```
 
 ## Testing
@@ -34,6 +36,8 @@ docker push mwazovzky/telegrambot-assistant
 Start app
 
 ```
+# set env variables
+export VAR_NAME=VAR_VALUE
 docker image rm {hash}
 docker compose -f docker-compose.prod.yml up -d
 ```

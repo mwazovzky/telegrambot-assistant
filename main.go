@@ -64,7 +64,7 @@ func main() {
 }
 
 func initAssistant(cfg config.OpenAIConfig, tr openai.TreadRepository) *openai.Assistant {
-	role := fmt.Sprintf("You are assistant. Your name is %s", cfg.Name)
+	role := fmt.Sprintf("%s Your name is %s", cfg.Role, cfg.Name)
 	client := openaiclient.NewOpenAiClient(cfg.ApiUrl, cfg.ApiKey)
 
 	return openai.NewAssistant(cfg.Model, role, client, tr)
