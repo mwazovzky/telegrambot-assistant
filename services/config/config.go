@@ -20,6 +20,7 @@ type OpenAIConfig struct {
 	ApiKey string `env:"OPENAI_API_KEY"`
 	Model  string `env:"OPENAI_MODEL"`
 	Name   string `env:"OPENAI_ASSISTANT_NAME"`
+	Role   string `env:"OPENAI_ASSISTANT_ROLE"`
 }
 
 type RedisConfig struct {
@@ -42,6 +43,7 @@ func Load() *Config {
 		ApiKey: os.Getenv("OPENAI_API_KEY"),
 		Model:  os.Getenv("OPENAI_MODEL"),
 		Name:   os.Getenv("OPENAI_ASSISTANT_NAME"),
+		Role:   os.Getenv("OPENAI_ASSISTANT_ROLE"),
 	}
 
 	redisConfig := RedisConfig{
