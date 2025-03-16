@@ -6,7 +6,7 @@ go test -v -race -coverprofile=testing/coverage.out ./...
 
 # Display coverage summary
 echo -e "\nCoverage summary:"
-go tool cover -func=coverage.out
+go tool cover -func=testing/coverage.out
 
 # Generate HTML report
 echo -e "\nGenerating HTML coverage report..."
