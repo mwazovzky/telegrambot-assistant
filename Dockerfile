@@ -3,7 +3,7 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CSO_ENABLED=0 GOOS=linux go build -o main .
+RUN go build -o main cmd/assistant/main.go
 
 FROM scratch
 WORKDIR /root/
