@@ -7,21 +7,21 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewThreadRepository(t *testing.T) {
-	repo := NewThreadRepository()
+func TestNewInmemoryRepository(t *testing.T) {
+	repo := NewInmemoryRepository()
 	assert.NotNil(t, repo)
 	assert.NotNil(t, repo.data)
 }
 
-func TestThreadRepository_CreateThread(t *testing.T) {
-	repo := NewThreadRepository()
+func TestInmemoryRepository_CreateThread(t *testing.T) {
+	repo := NewInmemoryRepository()
 	err := repo.CreateThread("testThread")
 	assert.NoError(t, err)
 	assert.Contains(t, repo.data, "testThread")
 }
 
-func TestThreadRepository_AppendMessage(t *testing.T) {
-	repo := NewThreadRepository()
+func TestInmemoryRepository_AppendMessage(t *testing.T) {
+	repo := NewInmemoryRepository()
 	repo.CreateThread("testThread")
 
 	msg := openai.Message{Role: "user", Content: "test message"}
@@ -31,8 +31,8 @@ func TestThreadRepository_AppendMessage(t *testing.T) {
 	assert.Equal(t, msg, repo.data["testThread"][0])
 }
 
-func TestThreadRepository_GetMessages(t *testing.T) {
-	repo := NewThreadRepository()
+func TestInmemoryRepository_GetMessages(t *testing.T) {
+	repo := NewInmemoryRepository()
 	repo.CreateThread("testThread")
 
 	msg := openai.Message{Role: "user", Content: "test message"}

@@ -57,7 +57,7 @@ func InitRepository(client repository.CacheClient) *repository.CacheRepository {
 	return repository.NewCachedRepository(client)
 }
 
-func InitOpenAiClient(cfg config.OpenAIConfig, tr assistant.TreadRepository) *assistant.Assistant {
+func InitAssistant(cfg config.OpenAIConfig, tr assistant.ThreadRepository) *assistant.Assistant {
 	role := fmt.Sprintf("%s Your name is %s", cfg.Role, cfg.Name)
 	client := openaiclient.NewOpenAiClient(cfg.ApiUrl, cfg.ApiKey)
 

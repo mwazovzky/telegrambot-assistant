@@ -16,6 +16,20 @@ func NewRedisService(client *redis.Client, ttl time.Duration) *RedisService {
 	return &RedisService{client, ttl}
 }
 
+func (rs *RedisService) Exists(key string) (bool, error) {
+	ctx := context.Background()
+
+	exists, err := rs.client.Exists(ctx, key).Result()
+	if err != nil {
+		return false, err
+	}
+
+	if exists == 0 {
+		return false, nil
+	}
+	return true, nil
+}
+
 func (rs *RedisService) Get(key string) (string, error) {
 	ctx := context.Background()
 	return rs.client.Get(ctx, key).Result()
