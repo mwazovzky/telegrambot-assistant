@@ -34,9 +34,19 @@ func (m *MockAssistant) Ask(req string, username string) (string, error) {
 	return args.String(0), args.Error(1)
 }
 
+type MockSplitter struct {
+	mock.Mock
+}
+
+func (m *MockSplitter) Split(text string) ([]string, error) {
+	args := m.Called(text)
+	return args.Get(0).([]string), args.Error(1)
+}
+
 func TestBot_parse(t *testing.T) {
 	mockBotAPI := new(MockBotAPI)
-	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890})
+	mockSplitter := new(MockSplitter)
+	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890}, mockSplitter)
 
 	tests := []struct {
 		chatID int64
@@ -64,36 +74,34 @@ func TestBot_parse(t *testing.T) {
 func TestSend(t *testing.T) {
 	mockBotAPI := new(MockBotAPI)
 	mockBotAPI.On("Send", mock.Anything).Return(tgbotapi.Message{}, nil)
+	mockSplitter := new(MockSplitter)
 
-	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890})
-	err := bot.send(12345, 1, "response message")
+	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890}, mockSplitter)
+	err := bot.send(12345, 1, []string{"response message"})
+
 	assert.NoError(t, err)
-
 	mockBotAPI.AssertExpectations(t)
 }
 
 func TestSend_Error(t *testing.T) {
 	mockBotAPI := new(MockBotAPI)
 	mockBotAPI.On("Send", mock.Anything).Return(tgbotapi.Message{}, assert.AnError)
+	mockSplitter := new(MockSplitter)
 
-	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890})
-	err := bot.send(12345, 1, "response message")
+	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890}, mockSplitter)
+	err := bot.send(12345, 1, []string{"response message"})
+
 	assert.Error(t, err)
-
 	mockBotAPI.AssertExpectations(t)
 }
 
 func TestBot_handleUpdate_Success(t *testing.T) {
 	mockBotAPI := new(MockBotAPI)
 	mockAssistant := new(MockAssistant)
-	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890})
-
-	// Mock the Ask method
+	mockSplitter := new(MockSplitter)
 	mockAssistant.On("Ask", "testuser", "test message").Return("response message", nil)
-
-	// Mock the Send method
+	mockSplitter.On("Split", "response message").Return([]string{"response message"}, nil)
 	mockBotAPI.On("Send", mock.Anything).Return(tgbotapi.Message{}, nil)
-
 	update := tgbotapi.Update{
 		Message: &tgbotapi.Message{
 			Chat: &tgbotapi.Chat{ID: 12345},
@@ -102,6 +110,7 @@ func TestBot_handleUpdate_Success(t *testing.T) {
 		},
 	}
 
+	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890}, mockSplitter)
 	bot.handleUpdate(update, mockAssistant)
 
 	mockAssistant.AssertExpectations(t)
@@ -111,8 +120,7 @@ func TestBot_handleUpdate_Success(t *testing.T) {
 func TestBot_handleUpdate_ParseError(t *testing.T) {
 	mockBotAPI := new(MockBotAPI)
 	mockAssistant := new(MockAssistant)
-	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890})
-
+	mockSplitter := new(MockSplitter)
 	update := tgbotapi.Update{
 		Message: &tgbotapi.Message{
 			Chat: &tgbotapi.Chat{ID: 67890},
@@ -121,20 +129,18 @@ func TestBot_handleUpdate_ParseError(t *testing.T) {
 		},
 	}
 
+	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890}, mockSplitter)
 	bot.handleUpdate(update, mockAssistant)
 
 	mockAssistant.AssertExpectations(t)
 	mockBotAPI.AssertExpectations(t)
 }
 
-func TestBot_handleUpdate_HandleError(t *testing.T) {
+func TestBot_handleUpdate_AskError(t *testing.T) {
 	mockBotAPI := new(MockBotAPI)
 	mockAssistant := new(MockAssistant)
-	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890})
-
-	// Mock the Ask method
+	mockSplitter := new(MockSplitter)
 	mockAssistant.On("Ask", "testuser", "test message").Return("", assert.AnError)
-
 	update := tgbotapi.Update{
 		Message: &tgbotapi.Message{
 			Chat: &tgbotapi.Chat{ID: 12345},
@@ -143,6 +149,7 @@ func TestBot_handleUpdate_HandleError(t *testing.T) {
 		},
 	}
 
+	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890}, mockSplitter)
 	bot.handleUpdate(update, mockAssistant)
 
 	mockAssistant.AssertExpectations(t)
@@ -152,14 +159,10 @@ func TestBot_handleUpdate_HandleError(t *testing.T) {
 func TestBot_handleUpdate_SendError(t *testing.T) {
 	mockBotAPI := new(MockBotAPI)
 	mockAssistant := new(MockAssistant)
-	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890})
-
-	// Mock the Ask method
+	mockSplitter := new(MockSplitter)
 	mockAssistant.On("Ask", "testuser", "test message").Return("response message", nil)
-
-	// Mock the Send method
+	mockSplitter.On("Split", "response message").Return([]string{"response message"}, nil)
 	mockBotAPI.On("Send", mock.Anything).Return(tgbotapi.Message{}, assert.AnError)
-
 	update := tgbotapi.Update{
 		Message: &tgbotapi.Message{
 			Chat: &tgbotapi.Chat{ID: 12345},
@@ -168,6 +171,7 @@ func TestBot_handleUpdate_SendError(t *testing.T) {
 		},
 	}
 
+	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890}, mockSplitter)
 	bot.handleUpdate(update, mockAssistant)
 
 	mockAssistant.AssertExpectations(t)
@@ -177,12 +181,12 @@ func TestBot_handleUpdate_SendError(t *testing.T) {
 func TestBot_handleUpdate_NilMessage(t *testing.T) {
 	mockBotAPI := new(MockBotAPI)
 	mockAssistant := new(MockAssistant)
-	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890})
-
+	mockSplitter := new(MockSplitter)
 	update := tgbotapi.Update{
 		Message: nil,
 	}
 
+	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890}, mockSplitter)
 	bot.handleUpdate(update, mockAssistant)
 
 	mockAssistant.AssertExpectations(t)
@@ -192,17 +196,14 @@ func TestBot_handleUpdate_NilMessage(t *testing.T) {
 func TestBot_HandleMessages(t *testing.T) {
 	mockBotAPI := new(MockBotAPI)
 	mockAssistant := new(MockAssistant)
-	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890})
-
-	// Mock the GetUpdatesChan method
+	mockSplitter := new(MockSplitter)
 	mockUpdates := make(chan tgbotapi.Update)
 	mockBotAPI.On("GetUpdatesChan", mock.Anything).Return((tgbotapi.UpdatesChannel)(mockUpdates))
-
-	// Mock the Ask method
 	mockAssistant.On("Ask", "testuser", "test message").Return("response message", nil)
-
-	// Mock the Send method
+	mockSplitter.On("Split", "response message").Return([]string{"response message"}, nil)
 	mockBotAPI.On("Send", mock.Anything).Return(tgbotapi.Message{}, nil)
+
+	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890}, mockSplitter)
 
 	var wg sync.WaitGroup
 	wg.Add(1)

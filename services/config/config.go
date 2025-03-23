@@ -16,6 +16,7 @@ type TelegramConfig struct {
 	ApiToken      string  `env:"TELEGRAM_API_TOKEN" required:"true"`
 	ChatID        int64   `env:"TELEGRAM_CHAT_ID" required:"true"`
 	AssignedChats []int64 `env:"TELEGRAM_ASSIGNED_CHATS" required:"true"`
+	MessageLimit  int     `env:"TELEGRAM_MESSAGE_LIMIT" required:"true"`
 }
 
 type OpenAIConfig struct {

@@ -13,6 +13,10 @@ type Assistant interface {
 	Ask(username string, request string) (response string, err error)
 }
 
+type Splitter interface {
+	Split(text string) ([]string, error)
+}
+
 type BotAPI interface {
 	Send(c tgbotapi.Chattable) (tgbotapi.Message, error)
 	GetUpdatesChan(config tgbotapi.UpdateConfig) tgbotapi.UpdatesChannel
@@ -23,14 +27,16 @@ type Bot struct {
 	name          string
 	chatID        int64
 	assignedChats []int64
+	splitter      Splitter
 }
 
-func NewBot(api BotAPI, name string, chatID int64, assignedChats []int64) *Bot {
+func NewBot(api BotAPI, name string, chatID int64, assignedChats []int64, splitter Splitter) *Bot {
 	return &Bot{
 		api:           api,
 		name:          name,
 		chatID:        chatID,
 		assignedChats: assignedChats,
+		splitter:      splitter,
 	}
 }
 
@@ -60,11 +66,17 @@ func (b *Bot) handleUpdate(update tgbotapi.Update, assistant Assistant) {
 
 	res, err := assistant.Ask(msg.From.UserName, req)
 	if err != nil {
-		log.Println("Message handler error:", err)
+		log.Println("Assistant error:", err)
 		return
 	}
 
-	err = b.send(msg.Chat.ID, msg.MessageID, res)
+	chunks, err := b.splitter.Split(res)
+	if err != nil {
+		log.Println("Splitter error:", err)
+		return
+	}
+
+	err = b.send(msg.Chat.ID, msg.MessageID, chunks)
 	if err != nil {
 		log.Println("Send error:", err)
 		return
@@ -90,9 +102,13 @@ func (b *Bot) parse(chatID int64, txt string) (string, error) {
 	return strings.TrimLeft(strings.TrimPrefix(txt, b.name), trimmedSymbols), nil
 }
 
-func (b *Bot) send(chatID int64, messageID int, text string) error {
-	msg := tgbotapi.NewMessage(chatID, text)
-	msg.ReplyToMessageID = messageID
-	_, err := b.api.Send(msg)
-	return err
+func (b *Bot) send(chatID int64, messageID int, chunks []string) error {
+	for _, chunk := range chunks {
+		msg := tgbotapi.NewMessage(chatID, chunk)
+		msg.ReplyToMessageID = messageID
+		_, err := b.api.Send(msg)
+		return err
+	}
+
+	return nil
 }

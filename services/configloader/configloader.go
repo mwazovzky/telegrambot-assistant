@@ -67,6 +67,12 @@ func setFieldValue(field reflect.Value, fieldType reflect.StructField, envValue 
 		} else {
 			return err
 		}
+	case reflect.Int:
+		if value, err := strconv.Atoi(envValue); err == nil {
+			field.SetInt(int64(value))
+		} else {
+			return err
+		}
 	case reflect.Slice:
 		if field.Type().Elem().Kind() == reflect.Int64 {
 			values := []int64{}

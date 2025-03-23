@@ -10,6 +10,7 @@ import (
 	"telegrambot-assistant/services/config"
 	"telegrambot-assistant/services/repository"
 	"telegrambot-assistant/services/storage"
+	"telegrambot-assistant/services/textsplitter"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/mwazovzky/assistant"
@@ -27,7 +28,9 @@ func InitBot(cfg config.TelegramConfig) (*bot.Bot, error) {
 
 	log.Printf("TelegramBot: authorized on account %s", telegramBot.Self.UserName)
 
-	return bot.NewBot(telegramBot, cfg.BotName, cfg.ChatID, cfg.AssignedChats), nil
+	splitter := textsplitter.NewTextSplitter(cfg.MessageLimit)
+
+	return bot.NewBot(telegramBot, cfg.BotName, cfg.ChatID, cfg.AssignedChats, splitter), nil
 }
 
 func InitRedis(cfg config.RedisConfig) *redis.Client {
