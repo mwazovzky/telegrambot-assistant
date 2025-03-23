@@ -6,8 +6,6 @@
 ## Dev
 
 ```bash
-# set env variables
-export VAR_NAME=VAR_VALUE
 docker compose build
 docker compose up -d
 ```
@@ -16,30 +14,29 @@ docker compose up -d
 
 ```bash
 go test ./... -v
-go test ./.../parser -v
-# generate coverage report
-./testing/coverage.sh
+# review test coverage
+./coverage.sh
+open coverage.html
 ```
 
-## Deploy
+## Config
+
+Please refer to .env.example for config parameters.
+
+## Build
 
 Create image
 
 ```bash
 docker build --platform=linux/amd64 -t mwazovzky/telegrambot-assistant .
-```
-
-Store image to docker hub
-
-```bash
 docker push mwazovzky/telegrambot-assistant
 ```
 
-Start app
+## Deploy
 
 ```bash
-# set env variables
-export VAR_NAME=VAR_VALUE
+docker compose down
+docker image ls
 docker image rm {hash}
 docker compose -f docker-compose.prod.yml up -d
 ```
