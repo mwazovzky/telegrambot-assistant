@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"telegrambot-assistant/services/assistant"
 	"telegrambot-assistant/services/config"
 	"telegrambot-assistant/services/setup"
 )
@@ -24,8 +23,7 @@ func main() {
 	redisClient := setup.InitRedis(cfg.Redis)
 	redisStorage := setup.InitStorage(redisClient, cfg.Redis.ExpirationTime)
 	threadRepo := setup.InitRepository(redisStorage)
-	openAiClient := setup.InitOpenAiClient(cfg.OpenAI, threadRepo)
-	openAiAssistant := assistant.NewAssistant(openAiClient)
+	openAiAssistant := setup.InitAssistant(cfg.OpenAI, threadRepo)
 
 	go bot.HandleMessages(openAiAssistant)
 

@@ -83,13 +83,13 @@ func TestSend_Error(t *testing.T) {
 	mockBotAPI.AssertExpectations(t)
 }
 
-func TestBot_handleUpdate(t *testing.T) {
+func TestBot_handleUpdate_Success(t *testing.T) {
 	mockBotAPI := new(MockBotAPI)
 	mockAssistant := new(MockAssistant)
 	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890})
 
 	// Mock the Ask method
-	mockAssistant.On("Ask", "test message", "testuser").Return("response message", nil)
+	mockAssistant.On("Ask", "testuser", "test message").Return("response message", nil)
 
 	// Mock the Send method
 	mockBotAPI.On("Send", mock.Anything).Return(tgbotapi.Message{}, nil)
@@ -133,7 +133,7 @@ func TestBot_handleUpdate_HandleError(t *testing.T) {
 	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890})
 
 	// Mock the Ask method
-	mockAssistant.On("Ask", "test message", "testuser").Return("", assert.AnError)
+	mockAssistant.On("Ask", "testuser", "test message").Return("", assert.AnError)
 
 	update := tgbotapi.Update{
 		Message: &tgbotapi.Message{
@@ -155,7 +155,7 @@ func TestBot_handleUpdate_SendError(t *testing.T) {
 	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890})
 
 	// Mock the Ask method
-	mockAssistant.On("Ask", "test message", "testuser").Return("response message", nil)
+	mockAssistant.On("Ask", "testuser", "test message").Return("response message", nil)
 
 	// Mock the Send method
 	mockBotAPI.On("Send", mock.Anything).Return(tgbotapi.Message{}, assert.AnError)
@@ -199,7 +199,7 @@ func TestBot_HandleMessages(t *testing.T) {
 	mockBotAPI.On("GetUpdatesChan", mock.Anything).Return((tgbotapi.UpdatesChannel)(mockUpdates))
 
 	// Mock the Ask method
-	mockAssistant.On("Ask", "test message", "testuser").Return("response message", nil)
+	mockAssistant.On("Ask", "testuser", "test message").Return("response message", nil)
 
 	// Mock the Send method
 	mockBotAPI.On("Send", mock.Anything).Return(tgbotapi.Message{}, nil)

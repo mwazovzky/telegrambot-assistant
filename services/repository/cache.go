@@ -7,6 +7,7 @@ import (
 )
 
 type CacheClient interface {
+	Exists(key string) (bool, error)
 	Get(key string) (string, error)
 	Set(key string, value string) error
 }
@@ -17,6 +18,10 @@ type CacheRepository struct {
 
 func NewCachedRepository(client CacheClient) *CacheRepository {
 	return &CacheRepository{client}
+}
+
+func (tr *CacheRepository) ThreadExists(key string) (bool, error) {
+	return tr.client.Exists(key)
 }
 
 func (tr *CacheRepository) CreateThread(key string) error {

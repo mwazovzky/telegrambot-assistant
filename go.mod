@@ -5,9 +5,9 @@ go 1.23.0
 require github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 
 require (
-	github.com/mwazovzky/assistant v0.0.3
+	github.com/mwazovzky/assistant v0.1.2
 	github.com/redis/go-redis/v9 v9.7.0
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 )
 
 require (

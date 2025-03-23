@@ -50,7 +50,7 @@ func TestInitRepository(t *testing.T) {
 	assert.NotNil(t, repo)
 }
 
-func TestInitOpenAiClient(t *testing.T) {
+func TestInitAssistant(t *testing.T) {
 	cfg := config.OpenAIConfig{
 		ApiUrl: "https://api.openai.com",
 		ApiKey: "testKey",
@@ -59,6 +59,6 @@ func TestInitOpenAiClient(t *testing.T) {
 		Role:   "testRole",
 	}
 	tr := new(repository.ThreadRepository)
-	client := InitOpenAiClient(cfg, tr)
+	client := InitAssistant(cfg, *tr)
 	assert.NotNil(t, client)
 }

@@ -10,7 +10,7 @@ import (
 )
 
 type Assistant interface {
-	Ask(string, string) (string, error)
+	Ask(username string, request string) (response string, err error)
 }
 
 type BotAPI interface {
@@ -58,7 +58,7 @@ func (b *Bot) handleUpdate(update tgbotapi.Update, assistant Assistant) {
 		return
 	}
 
-	res, err := assistant.Ask(req, msg.From.UserName)
+	res, err := assistant.Ask(msg.From.UserName, req)
 	if err != nil {
 		log.Println("Message handler error:", err)
 		return
