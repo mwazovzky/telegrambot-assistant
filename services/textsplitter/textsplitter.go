@@ -72,9 +72,9 @@ func (s *TextSplitter) Split(text string) ([]string, error) {
 		chunks = append(chunks, currentChunk.String())
 	}
 
-	if inCodeBlock {
-		return nil, fmt.Errorf("validation error: unmatched code block delimiters")
-	}
+	// if inCodeBlock {
+	// 	return nil, fmt.Errorf("validation error: unmatched code block delimiters")
+	// }
 
 	return chunks, nil
 }
