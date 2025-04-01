@@ -74,5 +74,5 @@ func InitBot(cfg config.TelegramConfig, logger bot.Logger) (*bot.Bot, error) {
 
 	splitter := textsplitter.NewTextSplitter(cfg.MessageLimit)
 
-	return bot.NewBot(telegramBot, cfg.BotName, cfg.ChatID, cfg.AssignedChats, splitter, logger), nil
+	return bot.NewBot(telegramBot, cfg.BotName, cfg.Users, cfg.Chats, splitter, logger), nil
 }

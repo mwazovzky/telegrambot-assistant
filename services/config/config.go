@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"telegrambot-assistant/services/configloader"
 	"time"
 )
@@ -13,11 +14,11 @@ type Config struct {
 }
 
 type TelegramConfig struct {
-	BotName       string  `env:"TELEGRAM_BOT_NAME" required:"true"`
-	ApiToken      string  `env:"TELEGRAM_API_TOKEN" required:"true"`
-	ChatID        int64   `env:"TELEGRAM_CHAT_ID" required:"true"`
-	AssignedChats []int64 `env:"TELEGRAM_ASSIGNED_CHATS" required:"true"`
-	MessageLimit  int     `env:"TELEGRAM_MESSAGE_LIMIT" required:"true"`
+	BotName      string   `env:"TELEGRAM_BOT_NAME" required:"true"`
+	ApiToken     string   `env:"TELEGRAM_API_TOKEN" required:"true"`
+	Users        []string `env:"TELEGRAM_USERS" required:"true"`
+	Chats        []int64  `env:"TELEGRAM_CHATS" required:"true"`
+	MessageLimit int      `env:"TELEGRAM_MESSAGE_LIMIT" required:"true"`
 }
 
 type OpenAIConfig struct {
@@ -43,17 +44,19 @@ type LokiConfig struct {
 
 func Load() (*Config, error) {
 	cfg := &Config{}
+
 	if err := configloader.LoadConfig(&cfg.Telegram); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("loading telegram config: %w", err)
 	}
 	if err := configloader.LoadConfig(&cfg.OpenAI); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("loading openai config: %w", err)
 	}
 	if err := configloader.LoadConfig(&cfg.Redis); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("loading redis config: %w", err)
 	}
 	if err := configloader.LoadConfig(&cfg.Loki); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("loading loki config: %w", err)
 	}
+
 	return cfg, nil
 }
