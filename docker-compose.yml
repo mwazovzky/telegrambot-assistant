@@ -1,7 +1,7 @@
 services:
   app:
     container_name: app
-    build: .
+    image: mwazovzky/telegrambot-assistant
     env_file:
       - .env
 

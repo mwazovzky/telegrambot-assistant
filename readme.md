@@ -32,11 +32,17 @@ docker build --platform=linux/amd64 -t mwazovzky/telegrambot-assistant .
 docker push mwazovzky/telegrambot-assistant
 ```
 
+## Run locally
+
+```bash
+docker compose -f docker-compose.dev.yml build
+docker compose -f docker-compose.dev.yml up -d
+```
+
 ## Deploy
 
 ```bash
-docker compose -f docker-compose.prod.yml down
-docker image ls
-docker image rm {hash}
-docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d --force-recreate
+docker image prune
 ```
