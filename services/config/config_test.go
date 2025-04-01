@@ -27,6 +27,10 @@ func TestLoad(t *testing.T) {
 	os.Setenv("REDIS_PASSWORD", "test_password")
 	os.Setenv("REDIS_EXPIRATION_TIME", "60")
 
+	os.Setenv("LOKI_URL", "http://localhost:3100") // Added missing environment variable
+	os.Setenv("LOKI_USERNAME", "test_user")
+	os.Setenv("LOKI_AUTH_TOKEN", "test_token")
+
 	cfg, err := Load()
 	assert.NoError(t, err)
 	assert.NotNil(t, cfg)
