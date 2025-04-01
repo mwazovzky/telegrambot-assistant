@@ -15,7 +15,9 @@ func main() {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	bot, err := setup.InitBot(cfg.Telegram)
+	logger := setup.InitLogger(cfg.Loki, "telegram-assistant")
+
+	bot, err := setup.InitBot(cfg.Telegram, logger)
 	if err != nil {
 		log.Fatalf("Failed to initialize Telegram bot: %v", err)
 	}

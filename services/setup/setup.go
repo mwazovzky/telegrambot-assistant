@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"time"
 
 	"telegrambot-assistant/services/bot"
@@ -15,23 +16,11 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/mwazovzky/assistant"
 	openaiclient "github.com/mwazovzky/assistant/http/client"
+	"github.com/mwazovzky/cloudlog"
 	"github.com/redis/go-redis/v9"
 )
 
 var newBotAPI = tgbotapi.NewBotAPI
-
-func InitBot(cfg config.TelegramConfig) (*bot.Bot, error) {
-	telegramBot, err := newBotAPI(cfg.ApiToken)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create Telegram bot: %v", err)
-	}
-
-	log.Printf("TelegramBot: authorized on account %s", telegramBot.Self.UserName)
-
-	splitter := textsplitter.NewTextSplitter(cfg.MessageLimit)
-
-	return bot.NewBot(telegramBot, cfg.BotName, cfg.ChatID, cfg.AssignedChats, splitter), nil
-}
 
 func InitRedis(cfg config.RedisConfig) *redis.Client {
 	addr := fmt.Sprintf("%s:%s", cfg.Host, cfg.Port)
@@ -65,4 +54,25 @@ func InitAssistant(cfg config.OpenAIConfig, tr assistant.ThreadRepository) *assi
 	client := openaiclient.NewOpenAiClient(cfg.ApiUrl, cfg.ApiKey)
 
 	return assistant.NewAssistant(cfg.Model, role, client, tr)
+}
+
+func InitLogger(cfg config.LokiConfig, service string) *cloudlog.Logger {
+	httpClient := &http.Client{
+		Timeout: 10 * time.Second, // Added timeout for HTTP client
+	}
+	client := cloudlog.NewClient(cfg.Url, cfg.Username, cfg.Token, httpClient)
+	return cloudlog.NewLogger(client, service)
+}
+
+func InitBot(cfg config.TelegramConfig, logger bot.Logger) (*bot.Bot, error) {
+	telegramBot, err := newBotAPI(cfg.ApiToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Telegram bot: %v", err)
+	}
+
+	log.Printf("TelegramBot: authorized on account %s", telegramBot.Self.UserName)
+
+	splitter := textsplitter.NewTextSplitter(cfg.MessageLimit)
+
+	return bot.NewBot(telegramBot, cfg.BotName, cfg.ChatID, cfg.AssignedChats, splitter, logger), nil
 }

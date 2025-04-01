@@ -2,7 +2,6 @@ package bot
 
 import (
 	"fmt"
-	"log"
 	"slices"
 	"strings"
 
@@ -22,21 +21,29 @@ type BotAPI interface {
 	GetUpdatesChan(config tgbotapi.UpdateConfig) tgbotapi.UpdatesChannel
 }
 
+type Logger interface {
+	Info(message string, keyValues ...interface{}) error
+	Error(message string, keyValues ...interface{}) error
+	Debug(message string, keyValues ...interface{}) error
+}
+
 type Bot struct {
 	api           BotAPI
 	name          string
 	chatID        int64
 	assignedChats []int64
 	splitter      Splitter
+	logger        Logger
 }
 
-func NewBot(api BotAPI, name string, chatID int64, assignedChats []int64, splitter Splitter) *Bot {
+func NewBot(api BotAPI, name string, chatID int64, assignedChats []int64, splitter Splitter, logger Logger) *Bot {
 	return &Bot{
 		api:           api,
 		name:          name,
 		chatID:        chatID,
 		assignedChats: assignedChats,
 		splitter:      splitter,
+		logger:        logger,
 	}
 }
 
@@ -56,33 +63,33 @@ func (b *Bot) handleUpdate(update tgbotapi.Update, assistant Assistant) {
 		return
 	}
 
-	log.Printf("Incoming message: chat_id: %d, from_user: %s, text: %s\n", msg.Chat.ID, msg.From.UserName, msg.Text)
+	b.logger.Debug("Incoming message", "chat_id", msg.Chat.ID, "from_user", msg.From.UserName, "text", msg.Text)
 
 	req, err := b.parse(msg.Chat.ID, msg.Text)
 	if err != nil {
-		log.Println("Parse error:", err)
+		b.logger.Error("Parse error", "chat_id", msg.Chat.ID, "from_user", msg.From.UserName, "error", err)
 		return
 	}
 
 	res, err := assistant.Ask(msg.From.UserName, req)
 	if err != nil {
-		log.Println("Assistant error:", err)
+		b.logger.Error("Assistant error", "chat_id", msg.Chat.ID, "from_user", msg.From.UserName, "error", err)
 		return
 	}
 
 	chunks, err := b.splitter.Split(res)
 	if err != nil {
-		log.Println("Splitter error:", err)
+		b.logger.Error("Splitter error", "chat_id", msg.Chat.ID, "from_user", msg.From.UserName, "error", err, "text", res)
 		return
 	}
 
 	err = b.send(msg.Chat.ID, msg.MessageID, chunks)
 	if err != nil {
-		log.Println("Send error:", err)
+		b.logger.Error("Send error", "chat_id", msg.Chat.ID, "from_user", msg.From.UserName, "error", err)
 		return
 	}
 
-	log.Printf("Outgoing message: chat_id: %d, reply_to_message_id: %d, text: %s", msg.Chat.ID, msg.MessageID, res)
+	b.logger.Debug("Outgoing message", "chat_id", msg.Chat.ID, "reply_to_message_id", msg.MessageID, "text", res)
 }
 
 func (b *Bot) parse(chatID int64, txt string) (string, error) {

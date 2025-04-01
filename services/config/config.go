@@ -9,6 +9,7 @@ type Config struct {
 	Telegram TelegramConfig
 	OpenAI   OpenAIConfig
 	Redis    RedisConfig
+	Loki     LokiConfig
 }
 
 type TelegramConfig struct {
@@ -34,6 +35,12 @@ type RedisConfig struct {
 	ExpirationTime time.Duration `env:"REDIS_EXPIRATION_TIME" required:"true"`
 }
 
+type LokiConfig struct {
+	Url      string `env:"LOKI_URL" required:"true"`
+	Username string `env:"LOKI_USERNAME" required:"true"`
+	Token    string `env:"LOKI_AUTH_TOKEN" required:"true"`
+}
+
 func Load() (*Config, error) {
 	cfg := &Config{}
 	if err := configloader.LoadConfig(&cfg.Telegram); err != nil {
@@ -43,6 +50,9 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	if err := configloader.LoadConfig(&cfg.Redis); err != nil {
+		return nil, err
+	}
+	if err := configloader.LoadConfig(&cfg.Loki); err != nil {
 		return nil, err
 	}
 	return cfg, nil

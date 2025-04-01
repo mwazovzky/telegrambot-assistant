@@ -35,7 +35,7 @@ docker push mwazovzky/telegrambot-assistant
 ## Deploy
 
 ```bash
-docker compose down
+docker compose -f docker-compose.prod.yml down
 docker image ls
 docker image rm {hash}
 docker compose -f docker-compose.prod.yml up -d

@@ -16,6 +16,25 @@ type MockBotAPI struct {
 	mock.Mock
 }
 
+type MockLogger struct {
+	mock.Mock
+}
+
+func (m *MockLogger) Info(message string, keyValues ...interface{}) error {
+	args := m.Called(message, keyValues)
+	return args.Error(0)
+}
+
+func (m *MockLogger) Error(message string, keyValues ...interface{}) error {
+	args := m.Called(message, keyValues)
+	return args.Error(0)
+}
+
+func (m *MockLogger) Debug(message string, keyValues ...interface{}) error {
+	args := m.Called(message, keyValues)
+	return args.Error(0)
+}
+
 func (m *MockBotAPI) Send(c tgbotapi.Chattable) (tgbotapi.Message, error) {
 	args := m.Called(c)
 	return args.Get(0).(tgbotapi.Message), args.Error(1)
@@ -39,7 +58,8 @@ func TestInitBot(t *testing.T) {
 		BotName:  "testBot",
 		ChatID:   12345,
 	}
-	bot, err := InitBot(cfg)
+	mockLogger := new(MockLogger)
+	bot, err := InitBot(cfg, mockLogger)
 	assert.NoError(t, err)
 	assert.NotNil(t, bot)
 }
@@ -61,4 +81,15 @@ func TestInitAssistant(t *testing.T) {
 	tr := new(repository.ThreadRepository)
 	client := InitAssistant(cfg, *tr)
 	assert.NotNil(t, client)
+}
+
+func TestInitLogger(t *testing.T) {
+	cfg := config.LokiConfig{
+		Url:      "http://localhost:3100",
+		Username: "test_user",
+		Token:    "test_token",
+	}
+	logger := InitLogger(cfg, "test_service")
+
+	assert.NotNil(t, logger)
 }
