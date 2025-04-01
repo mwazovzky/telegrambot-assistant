@@ -67,28 +67,33 @@ func TestBot_parse(t *testing.T) {
 	mockBotAPI := new(MockBotAPI)
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
-	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890}, mockSplitter, mockLogger)
+	bot := NewBot(mockBotAPI, "testbot", []string{"allowed_user"}, []int64{12345, 67890}, mockSplitter, mockLogger)
 
 	tests := []struct {
-		chatID int64
-		txt    string
-		want   string
-		err    bool
+		name     string
+		chatID   int64
+		username string
+		txt      string
+		want     string
+		err      bool
 	}{
-		{12345, "test message", "test message", false},
-		{67890, "testbot hello", "hello", false},
-		{67890, "hello", "", true},
-		{11111, "testbot hello", "", true},
+		{"allowed user can send message in any chat", 11111, "allowed_user", "test message", "test message", false}, // Even in disallowed chat
+		{"allowed user with bot prefix", 67890, "allowed_user", "testbot hello", "testbot hello", false},
+		{"non-allowed user in allowed chat", 67890, "other_user", "test message", "", true},
+		{"non-allowed user with prefix", 67890, "other_user", "testbot hello", "hello", false},
+		{"non-allowed user in disallowed chat", 11111, "other_user", "test message", "", true},
 	}
 
 	for _, tt := range tests {
-		got, err := bot.parse(tt.chatID, tt.txt)
-		if tt.err {
-			assert.Error(t, err)
-		} else {
-			assert.NoError(t, err)
-			assert.Equal(t, tt.want, got)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := bot.parse(tt.chatID, tt.username, tt.txt)
+			if tt.err {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.want, got)
+			}
+		})
 	}
 }
 
@@ -98,7 +103,7 @@ func TestSend(t *testing.T) {
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
 
-	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890}, mockSplitter, mockLogger)
+	bot := NewBot(mockBotAPI, "testbot", []string{"allowed_user"}, []int64{12345, 67890}, mockSplitter, mockLogger)
 	err := bot.send(12345, 1, []string{"response message"})
 
 	assert.NoError(t, err)
@@ -111,7 +116,7 @@ func TestSend_Error(t *testing.T) {
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
 
-	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890}, mockSplitter, mockLogger)
+	bot := NewBot(mockBotAPI, "testbot", []string{"allowed_user"}, []int64{12345, 67890}, mockSplitter, mockLogger)
 	err := bot.send(12345, 1, []string{"response message"})
 
 	assert.Error(t, err)
@@ -143,7 +148,7 @@ func TestBot_handleUpdate_Success(t *testing.T) {
 		},
 	}
 
-	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890}, mockSplitter, mockLogger)
+	bot := NewBot(mockBotAPI, "testbot", []string{"testuser"}, []int64{12345, 67890}, mockSplitter, mockLogger)
 	bot.handleUpdate(update, mockAssistant)
 
 	mockLogger.AssertExpectations(t)
@@ -164,6 +169,9 @@ func TestBot_handleUpdate_ParseError(t *testing.T) {
 		"chat_id", int64(67890), "from_user", "testuser", "error", fmt.Errorf("cannot process request"),
 	}).Return(nil)
 
+	// Note: We DON'T set up any expectations for mockAssistant.Ask
+	// because it should not be called after a parse error
+
 	update := tgbotapi.Update{
 		Message: &tgbotapi.Message{
 			Chat: &tgbotapi.Chat{ID: 67890},
@@ -172,11 +180,11 @@ func TestBot_handleUpdate_ParseError(t *testing.T) {
 		},
 	}
 
-	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890}, mockSplitter, mockLogger)
+	bot := NewBot(mockBotAPI, "testbot", []string{}, []int64{12345, 67890}, mockSplitter, mockLogger) // Empty users list to force parse error
 	bot.handleUpdate(update, mockAssistant)
 
 	mockLogger.AssertExpectations(t)
-	mockAssistant.AssertExpectations(t)
+	// Don't assert mockAssistant expectations as it shouldn't be called
 	mockBotAPI.AssertExpectations(t)
 }
 
@@ -203,7 +211,7 @@ func TestBot_handleUpdate_AskError(t *testing.T) {
 		},
 	}
 
-	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890}, mockSplitter, mockLogger)
+	bot := NewBot(mockBotAPI, "testbot", []string{"testuser"}, []int64{12345, 67890}, mockSplitter, mockLogger)
 	bot.handleUpdate(update, mockAssistant)
 
 	mockLogger.AssertExpectations(t)
@@ -236,7 +244,7 @@ func TestBot_handleUpdate_SendError(t *testing.T) {
 		},
 	}
 
-	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890}, mockSplitter, mockLogger)
+	bot := NewBot(mockBotAPI, "testbot", []string{"testuser"}, []int64{12345, 67890}, mockSplitter, mockLogger)
 	bot.handleUpdate(update, mockAssistant)
 
 	mockLogger.AssertExpectations(t)
@@ -253,7 +261,7 @@ func TestBot_handleUpdate_NilMessage(t *testing.T) {
 		Message: nil,
 	}
 
-	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890}, mockSplitter, mockLogger)
+	bot := NewBot(mockBotAPI, "testbot", []string{"allowed_user"}, []int64{12345, 67890}, mockSplitter, mockLogger)
 	bot.handleUpdate(update, mockAssistant)
 
 	mockAssistant.AssertExpectations(t)
@@ -279,7 +287,7 @@ func TestBot_HandleMessages(t *testing.T) {
 	mockSplitter.On("Split", "response message").Return([]string{"response message"}, nil)
 	mockBotAPI.On("Send", mock.Anything).Return(tgbotapi.Message{}, nil)
 
-	bot := NewBot(mockBotAPI, "testbot", 12345, []int64{12345, 67890}, mockSplitter, mockLogger)
+	bot := NewBot(mockBotAPI, "testbot", []string{"testuser"}, []int64{12345, 67890}, mockSplitter, mockLogger)
 
 	var wg sync.WaitGroup
 	wg.Add(1)

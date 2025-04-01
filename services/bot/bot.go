@@ -28,22 +28,22 @@ type Logger interface {
 }
 
 type Bot struct {
-	api           BotAPI
-	name          string
-	chatID        int64
-	assignedChats []int64
-	splitter      Splitter
-	logger        Logger
+	api      BotAPI
+	name     string
+	users    []string
+	chats    []int64
+	splitter Splitter
+	logger   Logger
 }
 
-func NewBot(api BotAPI, name string, chatID int64, assignedChats []int64, splitter Splitter, logger Logger) *Bot {
+func NewBot(api BotAPI, name string, users []string, chats []int64, splitter Splitter, logger Logger) *Bot {
 	return &Bot{
-		api:           api,
-		name:          name,
-		chatID:        chatID,
-		assignedChats: assignedChats,
-		splitter:      splitter,
-		logger:        logger,
+		api:      api,
+		name:     name,
+		users:    users,
+		chats:    chats,
+		splitter: splitter,
+		logger:   logger,
 	}
 }
 
@@ -65,7 +65,7 @@ func (b *Bot) handleUpdate(update tgbotapi.Update, assistant Assistant) {
 
 	b.logger.Debug("Incoming message", "chat_id", msg.Chat.ID, "from_user", msg.From.UserName, "text", msg.Text)
 
-	req, err := b.parse(msg.Chat.ID, msg.Text)
+	req, err := b.parse(msg.Chat.ID, msg.From.UserName, msg.Text)
 	if err != nil {
 		b.logger.Error("Parse error", "chat_id", msg.Chat.ID, "from_user", msg.From.UserName, "error", err)
 		return
@@ -92,21 +92,24 @@ func (b *Bot) handleUpdate(update tgbotapi.Update, assistant Assistant) {
 	b.logger.Debug("Outgoing message", "chat_id", msg.Chat.ID, "reply_to_message_id", msg.MessageID, "text", res)
 }
 
-func (b *Bot) parse(chatID int64, txt string) (string, error) {
-	if chatID == b.chatID {
+func (b *Bot) parse(chatID int64, username string, txt string) (string, error) {
+	// Check if the username is in the allowed users list
+	if slices.Contains(b.users, username) {
 		return txt, nil
 	}
-
-	if !slices.Contains(b.assignedChats, chatID) {
+	// Check if the chat ID is in the allowed chats list
+	if !slices.Contains(b.chats, chatID) {
 		return "", fmt.Errorf("cannot process chat")
 	}
-
+	// Check if group chat the message starts with the bot's name
 	if !strings.HasPrefix(txt, b.name) {
 		return "", fmt.Errorf("cannot process request")
 	}
-
+	// Remove the bot's name and any leading symbols
 	trimmedSymbols := "!, "
-	return strings.TrimLeft(strings.TrimPrefix(txt, b.name), trimmedSymbols), nil
+	trimmedText := strings.TrimPrefix(txt, b.name)
+	trimmedText = strings.TrimLeft(trimmedText, trimmedSymbols)
+	return trimmedText, nil
 }
 
 func (b *Bot) send(chatID int64, messageID int, chunks []string) error {

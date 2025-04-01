@@ -42,7 +42,7 @@ docker compose -f docker-compose.dev.yml up -d
 ## Deploy
 
 ```bash
-docker compose -f docker-compose.prod.yml pull
-docker compose -f docker-compose.prod.yml up -d --force-recreate
+docker compose pull
+docker compose up -d --force-recreate
 docker image prune
 ```

@@ -9,11 +9,12 @@ import (
 )
 
 type TestConfig struct {
-	StringField   string        `env:"STRING_FIELD" required:"true"`
-	IntField      int64         `env:"INT_FIELD" required:"true"`
-	SliceField    []int64       `env:"SLICE_FIELD" required:"true"`
-	DurationField time.Duration `env:"DURATION_FIELD" required:"true"`
-	OptionalField string        `env:"OPTIONAL_FIELD" required:"false"`
+	StringField      string        `env:"STRING_FIELD" required:"true"`
+	IntField         int64         `env:"INT_FIELD" required:"true"`
+	SliceField       []int64       `env:"SLICE_FIELD" required:"true"`
+	StringSliceField []string      `env:"STRING_SLICE_FIELD" required:"true"`
+	DurationField    time.Duration `env:"DURATION_FIELD" required:"true"`
+	OptionalField    string        `env:"OPTIONAL_FIELD" required:"false"`
 }
 
 func TestLoadConfig(t *testing.T) {
@@ -21,6 +22,7 @@ func TestLoadConfig(t *testing.T) {
 	os.Setenv("STRING_FIELD", "test_string")
 	os.Setenv("INT_FIELD", "12345")
 	os.Setenv("SLICE_FIELD", "12345,67890")
+	os.Setenv("STRING_SLICE_FIELD", "one,two,three") // Add string slice test
 	os.Setenv("DURATION_FIELD", "60")
 	os.Setenv("OPTIONAL_FIELD", "optional_value")
 
@@ -32,6 +34,7 @@ func TestLoadConfig(t *testing.T) {
 	assert.Equal(t, "test_string", cfg.StringField)
 	assert.Equal(t, int64(12345), cfg.IntField)
 	assert.Equal(t, []int64{12345, 67890}, cfg.SliceField)
+	assert.ElementsMatch(t, []string{"one", "two", "three"}, cfg.StringSliceField) // Test string slice
 	assert.Equal(t, time.Duration(60)*time.Second, cfg.DurationField)
 	assert.Equal(t, "optional_value", cfg.OptionalField)
 }
@@ -41,6 +44,7 @@ func TestLoadConfigMissingRequired(t *testing.T) {
 	os.Unsetenv("STRING_FIELD")
 	os.Unsetenv("INT_FIELD")
 	os.Unsetenv("SLICE_FIELD")
+	os.Unsetenv("STRING_SLICE_FIELD")
 	os.Unsetenv("DURATION_FIELD")
 
 	cfg := &TestConfig{}
@@ -53,6 +57,7 @@ func TestLoadConfigInvalidValues(t *testing.T) {
 	os.Setenv("STRING_FIELD", "test_string")
 	os.Setenv("INT_FIELD", "invalid")
 	os.Setenv("SLICE_FIELD", "invalid")
+	os.Setenv("STRING_SLICE_FIELD", "") // Test empty string slice
 	os.Setenv("DURATION_FIELD", "invalid")
 
 	cfg := &TestConfig{}
@@ -65,6 +70,7 @@ func TestLoadConfigEmptyValues(t *testing.T) {
 	os.Setenv("STRING_FIELD", "")
 	os.Setenv("INT_FIELD", "")
 	os.Setenv("SLICE_FIELD", "")
+	os.Setenv("STRING_SLICE_FIELD", "") // Test empty string slice
 	os.Setenv("DURATION_FIELD", "")
 
 	cfg := &TestConfig{}
@@ -77,6 +83,7 @@ func TestLoadConfigPartialValues(t *testing.T) {
 	os.Setenv("STRING_FIELD", "test_string")
 	os.Setenv("INT_FIELD", "12345")
 	os.Unsetenv("SLICE_FIELD")
+	os.Unsetenv("STRING_SLICE_FIELD") // Test missing string slice
 	os.Unsetenv("DURATION_FIELD")
 
 	cfg := &TestConfig{}

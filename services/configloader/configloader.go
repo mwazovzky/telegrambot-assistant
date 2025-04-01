@@ -84,6 +84,12 @@ func setFieldValue(field reflect.Value, fieldType reflect.StructField, envValue 
 				}
 			}
 			field.Set(reflect.ValueOf(values))
+		} else if field.Type().Elem().Kind() == reflect.String {
+			if envValue == "" {
+				return fmt.Errorf("empty string slice value")
+			}
+			values := strings.Split(envValue, ",")
+			field.Set(reflect.ValueOf(values))
 		}
 	}
 	return nil

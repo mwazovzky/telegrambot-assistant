@@ -54,9 +54,11 @@ func TestInitBot(t *testing.T) {
 	}
 
 	cfg := config.TelegramConfig{
-		ApiToken: "testToken",
-		BotName:  "testBot",
-		ChatID:   12345,
+		ApiToken:     "testToken",
+		BotName:      "testBot",
+		Users:        []string{"user1", "user2"}, // Added Users field
+		Chats:        []int64{12345, 67890},      // Updated Chats field
+		MessageLimit: 4096,                       // Added MessageLimit
 	}
 	mockLogger := new(MockLogger)
 	bot, err := InitBot(cfg, mockLogger)
