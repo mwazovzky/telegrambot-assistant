@@ -2,8 +2,9 @@ package config
 
 import (
 	"fmt"
-	"telegrambot-assistant/services/configloader"
 	"time"
+
+	"github.com/mwazovzky/config"
 )
 
 type Config struct {
@@ -45,16 +46,16 @@ type LokiConfig struct {
 func Load() (*Config, error) {
 	cfg := &Config{}
 
-	if err := configloader.LoadConfig(&cfg.Telegram); err != nil {
+	if err := config.LoadConfig(&cfg.Telegram); err != nil {
 		return nil, fmt.Errorf("loading telegram config: %w", err)
 	}
-	if err := configloader.LoadConfig(&cfg.OpenAI); err != nil {
+	if err := config.LoadConfig(&cfg.OpenAI); err != nil {
 		return nil, fmt.Errorf("loading openai config: %w", err)
 	}
-	if err := configloader.LoadConfig(&cfg.Redis); err != nil {
+	if err := config.LoadConfig(&cfg.Redis); err != nil {
 		return nil, fmt.Errorf("loading redis config: %w", err)
 	}
-	if err := configloader.LoadConfig(&cfg.Loki); err != nil {
+	if err := config.LoadConfig(&cfg.Loki); err != nil {
 		return nil, fmt.Errorf("loading loki config: %w", err)
 	}
 
