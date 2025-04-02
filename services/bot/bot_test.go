@@ -129,10 +129,10 @@ func TestBot_handleUpdate_Success(t *testing.T) {
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
 
-	mockLogger.On("Debug", "Incoming message", []interface{}{
+	mockLogger.On("Info", "Incoming message", []interface{}{
 		"chat_id", int64(12345), "from_user", "testuser", "text", "test message",
 	}).Return(nil)
-	mockLogger.On("Debug", "Outgoing message", []interface{}{
+	mockLogger.On("Info", "Outgoing message", []interface{}{
 		"chat_id", int64(12345), "reply_to_message_id", 0, "text", "response message",
 	}).Return(nil)
 
@@ -162,7 +162,7 @@ func TestBot_handleUpdate_ParseError(t *testing.T) {
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
 
-	mockLogger.On("Debug", "Incoming message", []interface{}{
+	mockLogger.On("Info", "Incoming message", []interface{}{
 		"chat_id", int64(67890), "from_user", "testuser", "text", "hello",
 	}).Return(nil)
 	mockLogger.On("Error", "Parse error", []interface{}{
@@ -194,7 +194,7 @@ func TestBot_handleUpdate_AskError(t *testing.T) {
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
 
-	mockLogger.On("Debug", "Incoming message", []interface{}{
+	mockLogger.On("Info", "Incoming message", []interface{}{
 		"chat_id", int64(12345), "from_user", "testuser", "text", "test message",
 	}).Return(nil)
 	mockLogger.On("Error", "Assistant error", []interface{}{
@@ -225,8 +225,11 @@ func TestBot_handleUpdate_SendError(t *testing.T) {
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
 
-	mockLogger.On("Debug", "Incoming message", []interface{}{
+	mockLogger.On("Info", "Incoming message", []interface{}{
 		"chat_id", int64(12345), "from_user", "testuser", "text", "test message",
+	}).Return(nil)
+	mockLogger.On("Info", "Outgoing message", []interface{}{
+		"chat_id", int64(12345), "reply_to_message_id", 0, "text", "response message",
 	}).Return(nil)
 	mockLogger.On("Error", "Send error", []interface{}{
 		"chat_id", int64(12345), "from_user", "testuser", "error", assert.AnError,
@@ -275,10 +278,10 @@ func TestBot_HandleMessages(t *testing.T) {
 	mockLogger := new(MockLogger)
 	mockUpdates := make(chan tgbotapi.Update)
 
-	mockLogger.On("Debug", "Incoming message", []interface{}{
+	mockLogger.On("Info", "Incoming message", []interface{}{
 		"chat_id", int64(12345), "from_user", "testuser", "text", "test message",
 	}).Return(nil)
-	mockLogger.On("Debug", "Outgoing message", []interface{}{
+	mockLogger.On("Info", "Outgoing message", []interface{}{
 		"chat_id", int64(12345), "reply_to_message_id", 0, "text", "response message",
 	}).Return(nil)
 
