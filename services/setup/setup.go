@@ -22,9 +22,8 @@ import (
 
 var newBotAPI = tgbotapi.NewBotAPI
 
-func InitRedis(cfg config.RedisConfig) *redis.Client {
+func InitRedis(cfg config.RedisConfig) (*redis.Client, error) {
 	addr := fmt.Sprintf("%s:%s", cfg.Host, cfg.Port)
-
 	client := redis.NewClient(&redis.Options{
 		Addr:     addr,
 		Password: cfg.Password,
@@ -32,13 +31,10 @@ func InitRedis(cfg config.RedisConfig) *redis.Client {
 	})
 
 	ctx := context.Background()
-	if _, err := client.Ping(ctx).Result(); err != nil {
-		log.Fatalf("Failed to connect to Redis: %v", err)
+	if err := client.Ping(ctx).Err(); err != nil {
+		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
 	}
-
-	log.Println("Connected to Redis")
-
-	return client
+	return client, nil
 }
 
 func InitStorage(r *redis.Client, ttl time.Duration) *storage.RedisService {
