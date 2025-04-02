@@ -22,8 +22,8 @@ func TestLoadConfig(t *testing.T) {
 	os.Setenv("STRING_FIELD", "test_string")
 	os.Setenv("INT_FIELD", "12345")
 	os.Setenv("SLICE_FIELD", "12345,67890")
-	os.Setenv("STRING_SLICE_FIELD", "one,two,three") // Add string slice test
-	os.Setenv("DURATION_FIELD", "60")
+	os.Setenv("STRING_SLICE_FIELD", "one,two,three")
+	os.Setenv("DURATION_FIELD", "60s") // Changed: explicitly specify seconds
 	os.Setenv("OPTIONAL_FIELD", "optional_value")
 
 	cfg := &TestConfig{}

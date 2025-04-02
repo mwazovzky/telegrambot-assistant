@@ -4,113 +4,127 @@ import (
 	"fmt"
 	"os"
 	"reflect"
-	"strconv"
-	"strings"
 	"time"
 )
 
-func LoadConfig(cfg interface{}) error {
-	if err := loadConfig(cfg); err != nil {
-		return err
-	}
-	if err := validateConfig(cfg); err != nil {
-		return err
-	}
-	return nil
+// ValueParser is responsible for parsing string values into specific types
+type ValueParser interface {
+	Parse(value string, field reflect.Value) error
 }
 
-func loadConfig(cfg interface{}) error {
-	v := reflect.ValueOf(cfg).Elem()
+// Validator is responsible for validating field values
+type Validator interface {
+	Validate(field reflect.Value, tags reflect.StructTag) error
+}
+
+// EnvLoader loads values from environment variables
+type EnvLoader struct {
+	parsers    map[reflect.Kind]ValueParser
+	validators []Validator
+}
+
+// Option represents a configuration option for EnvLoader
+type Option func(*EnvLoader)
+
+// WithParser adds a custom parser for a specific type
+func WithParser(kind reflect.Kind, parser ValueParser) Option {
+	return func(l *EnvLoader) {
+		l.parsers[kind] = parser
+	}
+}
+
+// WithValidator adds a custom validator
+func WithValidator(validator Validator) Option {
+	return func(l *EnvLoader) {
+		l.validators = append(l.validators, validator)
+	}
+}
+
+var defaultLoader = NewEnvLoader()
+
+// LoadConfig maintains backward compatibility using the default loader
+func LoadConfig(cfg interface{}) error {
+	return defaultLoader.LoadConfig(cfg)
+}
+
+// NewEnvLoader creates a new EnvLoader with default parsers and validators
+func NewEnvLoader(opts ...Option) *EnvLoader {
+	l := &EnvLoader{
+		parsers: map[reflect.Kind]ValueParser{
+			reflect.String: &StringParser{},
+			reflect.Int64:  &Int64Parser{},
+			reflect.Int:    &IntParser{},
+			reflect.Slice:  &SliceParser{},
+		},
+		validators: []Validator{&RequiredValidator{}},
+	}
+
+	// Apply custom options
+	for _, opt := range opts {
+		opt(l)
+	}
+
+	return l
+}
+
+// LoadConfig loads configuration from environment variables
+func (l *EnvLoader) LoadConfig(cfg interface{}) error {
+	v := reflect.ValueOf(cfg)
+	if v.Kind() != reflect.Ptr {
+		return fmt.Errorf("config must be a pointer")
+	}
+
+	return l.loadStruct(v.Elem())
+}
+
+func (l *EnvLoader) loadStruct(v reflect.Value) error {
 	t := v.Type()
 
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
 		fieldType := t.Field(i)
-		envKey := fieldType.Tag.Get("env")
-		required := fieldType.Tag.Get("required") == "true"
 
-		if envKey == "" {
-			if err := loadConfig(field.Addr().Interface()); err != nil {
-				return err
-			}
-			continue
-		}
-
-		envValue := os.Getenv(envKey)
-		if envValue == "" && required {
-			return fmt.Errorf("missing required environment variable: %s", envKey)
-		}
-
-		if err := setFieldValue(field, fieldType, envValue); err != nil {
-			return err
+		if err := l.loadField(field, fieldType); err != nil {
+			return fmt.Errorf("field %s: %w", fieldType.Name, err)
 		}
 	}
+
 	return nil
 }
 
-func setFieldValue(field reflect.Value, fieldType reflect.StructField, envValue string) error {
+func (l *EnvLoader) loadField(field reflect.Value, fieldType reflect.StructField) error {
+	envKey := fieldType.Tag.Get("env")
+	if envKey == "" {
+		return nil
+	}
+
+	envValue := os.Getenv(envKey)
+
+	// Special handling for time.Duration
 	if fieldType.Type == reflect.TypeOf(time.Duration(0)) {
-		if value, err := strconv.Atoi(envValue); err == nil {
-			field.Set(reflect.ValueOf(time.Duration(value) * time.Second))
-		} else {
+		parser := &DurationParser{}
+		if err := parser.Parse(envValue, field); err != nil {
 			return err
 		}
 		return nil
 	}
 
-	switch field.Kind() {
-	case reflect.String:
-		field.SetString(envValue)
-	case reflect.Int64:
-		if value, err := strconv.ParseInt(envValue, 10, 64); err == nil {
-			field.SetInt(value)
-		} else {
+	// Parse other types
+	parser, ok := l.parsers[field.Kind()]
+	if !ok {
+		return fmt.Errorf("unsupported type: %v", field.Kind())
+	}
+
+	if err := parser.Parse(envValue, field); err != nil {
+		return err
+	}
+
+	// Validate value
+	for _, validator := range l.validators {
+		if err := validator.Validate(field, fieldType.Tag); err != nil {
 			return err
 		}
-	case reflect.Int:
-		if value, err := strconv.Atoi(envValue); err == nil {
-			field.SetInt(int64(value))
-		} else {
-			return err
-		}
-	case reflect.Slice:
-		if field.Type().Elem().Kind() == reflect.Int64 {
-			values := []int64{}
-			for _, v := range strings.Split(envValue, ",") {
-				if value, err := strconv.ParseInt(v, 10, 64); err == nil {
-					values = append(values, value)
-				} else {
-					return err
-				}
-			}
-			field.Set(reflect.ValueOf(values))
-		} else if field.Type().Elem().Kind() == reflect.String {
-			if envValue == "" {
-				return fmt.Errorf("empty string slice value")
-			}
-			values := strings.Split(envValue, ",")
-			field.Set(reflect.ValueOf(values))
-		}
 	}
+
 	return nil
-}
-
-func validateConfig(cfg interface{}) error {
-	v := reflect.ValueOf(cfg).Elem()
-	t := v.Type()
-
-	for i := 0; i < v.NumField(); i++ {
-		field := v.Field(i)
-		fieldType := t.Field(i)
-		required := fieldType.Tag.Get("required") == "true"
-
-		if required && isZeroValue(field) {
-			return fmt.Errorf("missing required configuration: %s", fieldType.Name)
-		}
-	}
-	return nil
-}
-
-func isZeroValue(v reflect.Value) bool {
-	return reflect.DeepEqual(v.Interface(), reflect.Zero(v.Type()).Interface())
 }
