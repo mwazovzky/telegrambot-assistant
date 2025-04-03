@@ -1,13 +1,18 @@
-name: build-docker-image
+name: docker-build
 
 on:
   push:
-    branches:
-      - main
+    branches: ["main"]
+  workflow_run:
+    workflows: ["tests"]
+    types:
+      - completed
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Only run if the tests were successful and this is a push to main
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.ref == 'refs/heads/main' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
