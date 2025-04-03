@@ -1,5 +1,5 @@
-![test](https://github.com/mwazovzky/telegrambot-assistant/actions/workflows/test.yml/badge.svg)
-![build-docker-image](https://github.com/mwazovzky/telegrambot-assistant/actions/workflows/build-docker-image.yml/badge.svg)
+![Tests](https://github.com/mwazovzky/telegrambot-assistant/actions/workflows/test.yml/badge.svg)
+![Docker Build](https://github.com/mwazovzky/telegrambot-assistant/actions/workflows/build-docker-image.yml/badge.svg)
 
 # Telegram Bot Assistant
 
