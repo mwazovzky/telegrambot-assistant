@@ -6,7 +6,6 @@ import (
 )
 
 const newLine = "\n"
-const codeBlock = "```"
 
 type TextSplitter struct {
 	limit int
@@ -23,7 +22,6 @@ func (s *TextSplitter) Split(text string) ([]string, error) {
 
 	var chunks []string
 	var currentChunk strings.Builder
-	inCodeBlock := false
 
 	text = strings.TrimRight(text, newLine)
 	lines := strings.Split(text, newLine)
@@ -34,34 +32,8 @@ func (s *TextSplitter) Split(text string) ([]string, error) {
 		}
 
 		if currentChunk.Len()+len(line)+1 > s.limit {
-			chunkEndsWithCodeBlock := strings.HasSuffix(currentChunk.String(), codeBlock+newLine)
-
-			if inCodeBlock && !chunkEndsWithCodeBlock {
-				currentChunk.WriteString(codeBlock + newLine)
-			}
-
-			if inCodeBlock && chunkEndsWithCodeBlock {
-				str := currentChunk.String()
-				str = strings.TrimSuffix(str, codeBlock+newLine)
-				currentChunk.Reset()
-				currentChunk.WriteString(str)
-			}
-
 			chunks = append(chunks, currentChunk.String())
 			currentChunk.Reset()
-
-			if inCodeBlock && line != codeBlock {
-				currentChunk.WriteString(codeBlock + newLine)
-			}
-
-			if inCodeBlock && line == codeBlock {
-				inCodeBlock = !inCodeBlock
-				continue
-			}
-		}
-
-		if line == codeBlock {
-			inCodeBlock = !inCodeBlock
 		}
 
 		currentChunk.WriteString(line + newLine)
@@ -71,10 +43,6 @@ func (s *TextSplitter) Split(text string) ([]string, error) {
 	if len(currentChunk.String()) != 0 {
 		chunks = append(chunks, currentChunk.String())
 	}
-
-	// if inCodeBlock {
-	// 	return nil, fmt.Errorf("validation error: unmatched code block delimiters")
-	// }
 
 	return chunks, nil
 }
