@@ -180,7 +180,7 @@ func TestBot_handleUpdate_ParseError(t *testing.T) {
 		},
 	}
 
-	bot := NewBot(mockBotAPI, "testbot", []string{}, []int64{12345, 67890}, mockSplitter, mockLogger) // Empty users list to force parse error
+	bot := NewBot(mockBotAPI, "testbot", []string{}, []int64{12345, 67890}, mockSplitter, mockLogger) // Empty userChats list to force parse error
 	bot.handleUpdate(update, mockAssistant)
 
 	mockLogger.AssertExpectations(t)

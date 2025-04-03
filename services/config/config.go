@@ -17,8 +17,8 @@ type Config struct {
 type TelegramConfig struct {
 	BotName      string   `env:"TELEGRAM_BOT_NAME" required:"true"`
 	ApiToken     string   `env:"TELEGRAM_API_TOKEN" required:"true"`
-	Users        []string `env:"TELEGRAM_USERS" required:"true"`
-	Chats        []int64  `env:"TELEGRAM_CHATS" required:"true"`
+	Users        []string `env:"TELEGRAM_USER_CHATS" required:"true"`
+	Chats        []int64  `env:"TELEGRAM_GROUP_CHATS" required:"true"`
 	MessageLimit int      `env:"TELEGRAM_MESSAGE_LIMIT" required:"true"`
 }
 

@@ -11,8 +11,8 @@ import (
 func clearTestEnv() {
 	os.Unsetenv("TELEGRAM_BOT_NAME")
 	os.Unsetenv("TELEGRAM_API_TOKEN")
-	os.Unsetenv("TELEGRAM_USERS")
-	os.Unsetenv("TELEGRAM_CHATS")
+	os.Unsetenv("TELEGRAM_USER_CHATS")
+	os.Unsetenv("TELEGRAM_GROUP_CHATS")
 	os.Unsetenv("TELEGRAM_MESSAGE_LIMIT")
 
 	os.Unsetenv("OPENAI_API_URL")
@@ -36,8 +36,8 @@ func setupTestEnv() {
 
 	os.Setenv("TELEGRAM_BOT_NAME", "test_bot")
 	os.Setenv("TELEGRAM_API_TOKEN", "test_token")
-	os.Setenv("TELEGRAM_USERS", "user1,user2,user3")
-	os.Setenv("TELEGRAM_CHATS", "12345,67890")
+	os.Setenv("TELEGRAM_USER_CHATS", "user1,user2,user3")
+	os.Setenv("TELEGRAM_GROUP_CHATS", "12345,67890")
 	os.Setenv("TELEGRAM_MESSAGE_LIMIT", "4096")
 
 	os.Setenv("OPENAI_API_URL", "https://api.openai.com")
@@ -64,8 +64,8 @@ func TestLoad(t *testing.T) {
 	env := map[string]string{
 		"TELEGRAM_BOT_NAME":      "test_bot",
 		"TELEGRAM_API_TOKEN":     "test_token",
-		"TELEGRAM_USERS":         "user1,user2,user3",
-		"TELEGRAM_CHATS":         "12345,67890",
+		"TELEGRAM_USER_CHATS":    "user1,user2,user3",
+		"TELEGRAM_GROUP_CHATS":   "12345,67890",
 		"TELEGRAM_MESSAGE_LIMIT": "4096",
 		"OPENAI_API_URL":         "https://api.openai.com",
 		"OPENAI_API_KEY":         "test_api_key",
@@ -121,8 +121,8 @@ func TestLoadInvalidValues(t *testing.T) {
 	setupTestEnv()
 	defer clearTestEnv()
 
-	os.Setenv("TELEGRAM_USERS", "")        // Test empty users list
-	os.Setenv("TELEGRAM_CHATS", "invalid") // Test invalid chats
+	os.Setenv("TELEGRAM_USER_CHATS", "")         // Test empty userChats list
+	os.Setenv("TELEGRAM_GROUP_CHATS", "invalid") // Test invalid groupChats
 
 	cfg, err := Load()
 	assert.Error(t, err)

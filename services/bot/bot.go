@@ -28,22 +28,22 @@ type Logger interface {
 }
 
 type Bot struct {
-	botApi   BotAPI
-	name     string
-	users    []string
-	chats    []int64
-	splitter Splitter
-	logger   Logger
+	botApi     BotAPI
+	name       string
+	userChats  []string
+	groupChats []int64
+	splitter   Splitter
+	logger     Logger
 }
 
-func NewBot(botApi BotAPI, name string, users []string, chats []int64, splitter Splitter, logger Logger) *Bot {
+func NewBot(botApi BotAPI, name string, userChats []string, groupChats []int64, splitter Splitter, logger Logger) *Bot {
 	return &Bot{
-		botApi:   botApi,
-		name:     name,
-		users:    users,
-		chats:    chats,
-		splitter: splitter,
-		logger:   logger,
+		botApi:     botApi,
+		name:       name,
+		userChats:  userChats,
+		groupChats: groupChats,
+		splitter:   splitter,
+		logger:     logger,
 	}
 }
 
@@ -93,12 +93,12 @@ func (b *Bot) handleUpdate(update tgbotapi.Update, assistant Assistant) {
 }
 
 func (b *Bot) parse(chatID int64, username string, txt string) (string, error) {
-	// Check if the username is in the allowed users list
-	if slices.Contains(b.users, username) {
+	// Check if the username is in the allowed userChats list
+	if slices.Contains(b.userChats, username) {
 		return txt, nil
 	}
-	// Check if the chat ID is in the allowed chats list
-	if !slices.Contains(b.chats, chatID) {
+	// Check if the chat ID is in the allowed groupChats list
+	if !slices.Contains(b.groupChats, chatID) {
 		return "", fmt.Errorf("cannot process chat")
 	}
 	// Check if group chat the message starts with the bot's name
