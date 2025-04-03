@@ -77,11 +77,13 @@ func TestBot_parse(t *testing.T) {
 		want     string
 		err      bool
 	}{
-		{"allowed user can send message in any chat", 11111, "allowed_user", "test message", "test message", false}, // Even in disallowed chat
-		{"allowed user with bot prefix", 67890, "allowed_user", "testbot hello", "testbot hello", false},
-		{"non-allowed user in allowed chat", 67890, "other_user", "test message", "", true},
-		{"non-allowed user with prefix", 67890, "other_user", "testbot hello", "hello", false},
-		{"non-allowed user in disallowed chat", 11111, "other_user", "test message", "", true},
+		{"allowed user in private chat", 11111, "allowed_user", "test message", "test message", false},                    // Private chat, allowed user
+		{"allowed user in group chat without prefix", 67890, "allowed_user", "test message", "", true},                    // Group chat but no prefix
+		{"allowed user in group chat with prefix", 67890, "allowed_user", "testbot hello", "hello", false},                // Group chat with prefix
+		{"non-allowed user in group chat with prefix", 67890, "other_user", "testbot hello", "hello", false},              // Non-allowed user but in group with prefix
+		{"non-allowed user in group chat with prefix and symbols", 67890, "other_user", "testbot! hello", "hello", false}, // Same with symbols
+		{"non-allowed user in group chat without prefix", 67890, "other_user", "test message", "", true},                  // No prefix in group chat
+		{"non-allowed user in private chat", 11111, "other_user", "test message", "", true},                               // Not allowed user in private chat
 	}
 
 	for _, tt := range tests {
@@ -99,12 +101,12 @@ func TestBot_parse(t *testing.T) {
 
 func TestSend(t *testing.T) {
 	mockBotAPI := new(MockBotAPI)
-	mockBotAPI.On("Send", mock.Anything).Return(tgbotapi.Message{}, nil)
+	mockBotAPI.On("Send", mock.Anything).Return(tgbotapi.Message{}, nil).Times(2) // Should be called for each chunk
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
 
 	bot := NewBot(mockBotAPI, "testbot", []string{"allowed_user"}, []int64{12345, 67890}, mockSplitter, mockLogger)
-	err := bot.send(12345, 1, []string{"response message"})
+	err := bot.send(12345, 1, []string{"message part 1", "message part 2"})
 
 	assert.NoError(t, err)
 	mockBotAPI.AssertExpectations(t)
@@ -130,21 +132,86 @@ func TestBot_handleUpdate_Success(t *testing.T) {
 	mockLogger := new(MockLogger)
 
 	mockLogger.On("Info", "Incoming message", []interface{}{
-		"chat_id", int64(12345), "from_user", "testuser", "text", "test message",
+		"chat_id", int64(11111), "from_user", "testuser", "text", "test message",
 	}).Return(nil)
 	mockLogger.On("Info", "Outgoing message", []interface{}{
-		"chat_id", int64(12345), "reply_to_message_id", 0, "text", "response message",
+		"chat_id", int64(11111), "reply_to_message_id", 0, "text", "response message",
 	}).Return(nil)
 
 	mockAssistant.On("Ask", "testuser", "test message").Return("response message", nil)
 	mockSplitter.On("Split", "response message").Return([]string{"response message"}, nil)
 	mockBotAPI.On("Send", mock.Anything).Return(tgbotapi.Message{}, nil)
 
+	// Use chat ID that's NOT in groupChats to ensure it's treated as a private chat
 	update := tgbotapi.Update{
 		Message: &tgbotapi.Message{
-			Chat: &tgbotapi.Chat{ID: 12345},
+			Chat: &tgbotapi.Chat{ID: 11111},
 			From: &tgbotapi.User{UserName: "testuser"},
 			Text: "test message",
+		},
+	}
+
+	bot := NewBot(mockBotAPI, "testbot", []string{"testuser"}, []int64{12345, 67890}, mockSplitter, mockLogger)
+	bot.handleUpdate(update, mockAssistant)
+
+	mockLogger.AssertExpectations(t)
+	mockAssistant.AssertExpectations(t)
+	mockBotAPI.AssertExpectations(t)
+}
+
+func TestBot_handleUpdate_Success_GroupChat(t *testing.T) {
+	mockBotAPI := new(MockBotAPI)
+	mockAssistant := new(MockAssistant)
+	mockSplitter := new(MockSplitter)
+	mockLogger := new(MockLogger)
+
+	mockLogger.On("Info", "Incoming message", []interface{}{
+		"chat_id", int64(67890), "from_user", "testuser", "text", "testbot hello",
+	}).Return(nil)
+	mockLogger.On("Info", "Outgoing message", []interface{}{
+		"chat_id", int64(67890), "reply_to_message_id", 0, "text", "response message",
+	}).Return(nil)
+
+	mockAssistant.On("Ask", "testuser", "hello").Return("response message", nil)
+	mockSplitter.On("Split", "response message").Return([]string{"response message"}, nil)
+	mockBotAPI.On("Send", mock.Anything).Return(tgbotapi.Message{}, nil)
+
+	// Use a chat ID that is in groupChats and include the bot name prefix
+	update := tgbotapi.Update{
+		Message: &tgbotapi.Message{
+			Chat: &tgbotapi.Chat{ID: 67890},
+			From: &tgbotapi.User{UserName: "testuser"},
+			Text: "testbot hello",
+		},
+	}
+
+	bot := NewBot(mockBotAPI, "testbot", []string{"testuser"}, []int64{12345, 67890}, mockSplitter, mockLogger)
+	bot.handleUpdate(update, mockAssistant)
+
+	mockLogger.AssertExpectations(t)
+	mockAssistant.AssertExpectations(t)
+	mockBotAPI.AssertExpectations(t)
+}
+
+func TestBot_handleUpdate_ParseError_GroupChatNoPrefix(t *testing.T) {
+	mockBotAPI := new(MockBotAPI)
+	mockAssistant := new(MockAssistant)
+	mockSplitter := new(MockSplitter)
+	mockLogger := new(MockLogger)
+
+	mockLogger.On("Info", "Incoming message", []interface{}{
+		"chat_id", int64(12345), "from_user", "testuser", "text", "hello without prefix",
+	}).Return(nil)
+	mockLogger.On("Error", "Parse error", []interface{}{
+		"chat_id", int64(12345), "from_user", "testuser", "error", fmt.Errorf("cannot process chat message"),
+	}).Return(nil)
+
+	// Message in group chat without bot prefix
+	update := tgbotapi.Update{
+		Message: &tgbotapi.Message{
+			Chat: &tgbotapi.Chat{ID: 12345}, // Group chat
+			From: &tgbotapi.User{UserName: "testuser"},
+			Text: "hello without prefix",
 		},
 	}
 
@@ -166,11 +233,8 @@ func TestBot_handleUpdate_ParseError(t *testing.T) {
 		"chat_id", int64(67890), "from_user", "testuser", "text", "hello",
 	}).Return(nil)
 	mockLogger.On("Error", "Parse error", []interface{}{
-		"chat_id", int64(67890), "from_user", "testuser", "error", fmt.Errorf("cannot process request"),
+		"chat_id", int64(67890), "from_user", "testuser", "error", fmt.Errorf("cannot process chat message"),
 	}).Return(nil)
-
-	// Note: We DON'T set up any expectations for mockAssistant.Ask
-	// because it should not be called after a parse error
 
 	update := tgbotapi.Update{
 		Message: &tgbotapi.Message{
@@ -180,7 +244,7 @@ func TestBot_handleUpdate_ParseError(t *testing.T) {
 		},
 	}
 
-	bot := NewBot(mockBotAPI, "testbot", []string{}, []int64{12345, 67890}, mockSplitter, mockLogger) // Empty users list to force parse error
+	bot := NewBot(mockBotAPI, "testbot", []string{}, []int64{12345, 67890}, mockSplitter, mockLogger) // Empty userChats list to force parse error
 	bot.handleUpdate(update, mockAssistant)
 
 	mockLogger.AssertExpectations(t)
@@ -195,17 +259,17 @@ func TestBot_handleUpdate_AskError(t *testing.T) {
 	mockLogger := new(MockLogger)
 
 	mockLogger.On("Info", "Incoming message", []interface{}{
-		"chat_id", int64(12345), "from_user", "testuser", "text", "test message",
+		"chat_id", int64(11111), "from_user", "testuser", "text", "test message",
 	}).Return(nil)
 	mockLogger.On("Error", "Assistant error", []interface{}{
-		"chat_id", int64(12345), "from_user", "testuser", "error", assert.AnError,
+		"chat_id", int64(11111), "from_user", "testuser", "error", assert.AnError,
 	}).Return(nil)
 
 	mockAssistant.On("Ask", "testuser", "test message").Return("", assert.AnError)
 
 	update := tgbotapi.Update{
 		Message: &tgbotapi.Message{
-			Chat: &tgbotapi.Chat{ID: 12345},
+			Chat: &tgbotapi.Chat{ID: 11111}, // Use non-group chat ID
 			From: &tgbotapi.User{UserName: "testuser"},
 			Text: "test message",
 		},
@@ -226,13 +290,13 @@ func TestBot_handleUpdate_SendError(t *testing.T) {
 	mockLogger := new(MockLogger)
 
 	mockLogger.On("Info", "Incoming message", []interface{}{
-		"chat_id", int64(12345), "from_user", "testuser", "text", "test message",
+		"chat_id", int64(11111), "from_user", "testuser", "text", "test message",
 	}).Return(nil)
 	mockLogger.On("Info", "Outgoing message", []interface{}{
-		"chat_id", int64(12345), "reply_to_message_id", 0, "text", "response message",
+		"chat_id", int64(11111), "reply_to_message_id", 0, "text", "response message",
 	}).Return(nil)
 	mockLogger.On("Error", "Send error", []interface{}{
-		"chat_id", int64(12345), "from_user", "testuser", "error", assert.AnError,
+		"chat_id", int64(11111), "from_user", "testuser", "error", assert.AnError,
 	}).Return(nil)
 
 	mockAssistant.On("Ask", "testuser", "test message").Return("response message", nil)
@@ -241,7 +305,7 @@ func TestBot_handleUpdate_SendError(t *testing.T) {
 
 	update := tgbotapi.Update{
 		Message: &tgbotapi.Message{
-			Chat: &tgbotapi.Chat{ID: 12345},
+			Chat: &tgbotapi.Chat{ID: 11111}, // Use non-group chat ID
 			From: &tgbotapi.User{UserName: "testuser"},
 			Text: "test message",
 		},
@@ -279,10 +343,10 @@ func TestBot_HandleMessages(t *testing.T) {
 	mockUpdates := make(chan tgbotapi.Update)
 
 	mockLogger.On("Info", "Incoming message", []interface{}{
-		"chat_id", int64(12345), "from_user", "testuser", "text", "test message",
+		"chat_id", int64(11111), "from_user", "testuser", "text", "test message",
 	}).Return(nil)
 	mockLogger.On("Info", "Outgoing message", []interface{}{
-		"chat_id", int64(12345), "reply_to_message_id", 0, "text", "response message",
+		"chat_id", int64(11111), "reply_to_message_id", 0, "text", "response message",
 	}).Return(nil)
 
 	mockBotAPI.On("GetUpdatesChan", mock.Anything).Return((tgbotapi.UpdatesChannel)(mockUpdates))
@@ -300,10 +364,10 @@ func TestBot_HandleMessages(t *testing.T) {
 		bot.HandleMessages(mockAssistant)
 	}()
 
-	// Send a mock update
+	// Send a mock update with a non-group chat ID
 	mockUpdates <- tgbotapi.Update{
 		Message: &tgbotapi.Message{
-			Chat: &tgbotapi.Chat{ID: 12345},
+			Chat: &tgbotapi.Chat{ID: 11111},
 			From: &tgbotapi.User{UserName: "testuser"},
 			Text: "test message",
 		},

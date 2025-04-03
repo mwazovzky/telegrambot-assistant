@@ -28,22 +28,22 @@ type Logger interface {
 }
 
 type Bot struct {
-	botApi   BotAPI
-	name     string
-	users    []string
-	chats    []int64
-	splitter Splitter
-	logger   Logger
+	botApi     BotAPI
+	name       string
+	userChats  []string
+	groupChats []int64
+	splitter   Splitter
+	logger     Logger
 }
 
-func NewBot(botApi BotAPI, name string, users []string, chats []int64, splitter Splitter, logger Logger) *Bot {
+func NewBot(botApi BotAPI, name string, userChats []string, groupChats []int64, splitter Splitter, logger Logger) *Bot {
 	return &Bot{
-		botApi:   botApi,
-		name:     name,
-		users:    users,
-		chats:    chats,
-		splitter: splitter,
-		logger:   logger,
+		botApi:     botApi,
+		name:       name,
+		userChats:  userChats,
+		groupChats: groupChats,
+		splitter:   splitter,
+		logger:     logger,
 	}
 }
 
@@ -93,23 +93,21 @@ func (b *Bot) handleUpdate(update tgbotapi.Update, assistant Assistant) {
 }
 
 func (b *Bot) parse(chatID int64, username string, txt string) (string, error) {
-	// Check if the username is in the allowed users list
-	if slices.Contains(b.users, username) {
+	// handle user chat message
+	if slices.Contains(b.userChats, username) && !slices.Contains(b.groupChats, chatID) {
 		return txt, nil
 	}
-	// Check if the chat ID is in the allowed chats list
-	if !slices.Contains(b.chats, chatID) {
-		return "", fmt.Errorf("cannot process chat")
+
+	// handle group chat message
+	if slices.Contains(b.groupChats, chatID) && strings.HasPrefix(txt, b.name) {
+		// Remove the bot's name and any leading symbols
+		trimmedSymbols := "!, "
+		trimmedText := strings.TrimPrefix(txt, b.name)
+		trimmedText = strings.TrimLeft(trimmedText, trimmedSymbols)
+		return trimmedText, nil
 	}
-	// Check if group chat the message starts with the bot's name
-	if !strings.HasPrefix(txt, b.name) {
-		return "", fmt.Errorf("cannot process request")
-	}
-	// Remove the bot's name and any leading symbols
-	trimmedSymbols := "!, "
-	trimmedText := strings.TrimPrefix(txt, b.name)
-	trimmedText = strings.TrimLeft(trimmedText, trimmedSymbols)
-	return trimmedText, nil
+
+	return "", fmt.Errorf("cannot process chat message")
 }
 
 func (b *Bot) send(chatID int64, messageID int, chunks []string) error {
@@ -117,8 +115,9 @@ func (b *Bot) send(chatID int64, messageID int, chunks []string) error {
 		msg := tgbotapi.NewMessage(chatID, chunk)
 		msg.ReplyToMessageID = messageID
 		_, err := b.botApi.Send(msg)
-		return err
+		if err != nil {
+			return err
+		}
 	}
-
 	return nil
 }
