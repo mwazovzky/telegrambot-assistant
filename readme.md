@@ -3,43 +3,110 @@
 
 # Telegram Bot Assistant
 
-## Dev
+A Telegram bot that provides AI-powered assistance in private and group chats, leveraging OpenAI's models to respond to user queries.
 
-```bash
-docker compose build
-docker compose up -d
+## Features
+
+- **Private Chat Support**: Direct interactions with authorized users
+- **Group Chat Support**: Responds when mentioned by name in authorized groups
+- **Smart Response Handling**: Two modes for handling long responses:
+  - **Show More Button**: Interactive "Show More" button for incremental reading
+  - **Full Response**: Send all chunks at once for immediate access
+- **Configurable**: Easily adjustable through environment variables
+- **Persistent Context**: Conversation history stored in Redis
+- **Secure**: Access control for both private chats and groups
+
+## Usage
+
+### Private Chat
+
+Send a message directly to the bot in a private chat. The bot will respond if you're in the authorized users list.
+
+### Group Chat
+
+In group chats, invite bot to the chat, mention the bot by name at the beginning of your message
+
+## Setup
+
+### Prerequisites
+
+- Go 1.23 or higher
+- Docker & Docker Compose (for containerized deployment)
+- OpenAI API key
+- Telegram Bot Token (from @BotFather)
+- Redis (for conversation persistence)
+
+### Environment Variables
+
+Create a `.env` file in the project root with the following configuration:
+
+```env
+# Telegram Configuration
+TELEGRAM_BOT_NAME=your_bot_name
+TELEGRAM_API_TOKEN=your_telegram_token
+TELEGRAM_USER_CHATS=user1,user2
+TELEGRAM_GROUP_CHATS=-100123456789,-100987654321
+TELEGRAM_MESSAGE_LIMIT=4096
+TELEGRAM_SHOW_MORE=true
+
+# OpenAI Configuration
+OPENAI_API_URL=https://api.openai.com/v1
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_ASSISTANT_NAME=Assistant
+OPENAI_ASSISTANT_ROLE="You are a helpful assistant."
+
+# Redis Configuration
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=your_redis_password
+REDIS_EXPIRATION_TIME=24h
+
+# Loki Logging
+LOKI_URL=http://localhost:3100
+LOKI_USERNAME=loki
+LOKI_AUTH_TOKEN=your_loki_token
 ```
 
-## Testing
+Please refer to `.env.example` for additional configuration parameters.
 
-```bash
-go test ./... -v
-# review test coverage
-./coverage.sh
-open coverage.html
-```
+## Development
 
-## Config
+### Local Development
 
-Please refer to .env.example for config parameters.
-
-## Build
-
-Create image
-
-```bash
-docker build --platform=linux/amd64 -t mwazovzky/telegrambot-assistant .
-docker push mwazovzky/telegrambot-assistant
-```
-
-## Run locally
+Run the application locally using Docker Compose:
 
 ```bash
 docker compose -f docker-compose.dev.yml build
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-## Deploy
+### Testing
+
+Run the test suite:
+
+```bash
+# Run test
+go test ./... -v
+# Generate test coverage
+./coverage.sh
+# Review test coverage
+open coverage.html
+```
+
+### Building
+
+Create and push a Docker image:
+
+```bash
+# Build for production
+docker build --platform=linux/amd64 -t {username}/telegrambot-assistant .
+docker push {username}/telegrambot-assistant
+```
+
+## Deployment
+
+Pull the latest image and deploy the application:
 
 ```bash
 docker compose pull

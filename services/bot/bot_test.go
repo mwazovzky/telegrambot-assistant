@@ -67,7 +67,14 @@ func TestBot_parse(t *testing.T) {
 	mockBotAPI := new(MockBotAPI)
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
-	bot := NewBot(mockBotAPI, "testbot", []string{"allowed_user"}, []int64{12345, 67890}, mockSplitter, mockLogger)
+	config := BotConfig{
+		Name:        "testbot",
+		UserChats:   []string{"allowed_user"},
+		GroupChats:  []int64{12345, 67890},
+		UseShowMore: true,
+	}
+
+	bot := NewBot(mockBotAPI, config, mockSplitter, mockLogger)
 
 	tests := []struct {
 		name     string
@@ -99,17 +106,168 @@ func TestBot_parse(t *testing.T) {
 	}
 }
 
-func TestSend(t *testing.T) {
+// Test sending with Show More enabled
+func TestSend_WithShowMore(t *testing.T) {
 	mockBotAPI := new(MockBotAPI)
-	mockBotAPI.On("Send", mock.Anything).Return(tgbotapi.Message{}, nil).Times(2) // Should be called for each chunk
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
 
-	bot := NewBot(mockBotAPI, "testbot", []string{"allowed_user"}, []int64{12345, 67890}, mockSplitter, mockLogger)
-	err := bot.send(12345, 1, []string{"message part 1", "message part 2"})
+	// Expect only the first message to be sent (with button)
+	mockBotAPI.On("Send", mock.MatchedBy(func(c tgbotapi.Chattable) bool {
+		msg, ok := c.(tgbotapi.MessageConfig)
+		return ok && msg.Text == "message part 1" && msg.ReplyMarkup != nil
+	})).Return(tgbotapi.Message{}, nil).Once()
+
+	config := BotConfig{
+		Name:        "testbot",
+		UserChats:   []string{"allowed_user"},
+		GroupChats:  []int64{12345, 67890},
+		UseShowMore: true,
+	}
+
+	bot := NewBot(mockBotAPI, config, mockSplitter, mockLogger)
+	err := bot.send(12345, "testuser", 1, []string{"message part 1", "message part 2"})
 
 	assert.NoError(t, err)
 	mockBotAPI.AssertExpectations(t)
+
+	// Check that the chunks were stored
+	bot.chunksMutex.RLock()
+	queue, exists := bot.pendingChunks["12345:testuser"]
+	bot.chunksMutex.RUnlock()
+
+	assert.True(t, exists)
+	assert.Equal(t, 1, queue.Position)
+	assert.Equal(t, []string{"message part 1", "message part 2"}, queue.Chunks)
+}
+
+// Test sending with Show More disabled
+func TestSend_WithoutShowMore(t *testing.T) {
+	mockBotAPI := new(MockBotAPI)
+	mockSplitter := new(MockSplitter)
+	mockLogger := new(MockLogger)
+
+	// Expect both messages to be sent (without buttons)
+	mockBotAPI.On("Send", mock.MatchedBy(func(c tgbotapi.Chattable) bool {
+		msg, ok := c.(tgbotapi.MessageConfig)
+		return ok && msg.Text == "message part 1" && msg.ReplyMarkup == nil
+	})).Return(tgbotapi.Message{}, nil).Once()
+
+	mockBotAPI.On("Send", mock.MatchedBy(func(c tgbotapi.Chattable) bool {
+		msg, ok := c.(tgbotapi.MessageConfig)
+		return ok && msg.Text == "message part 2" && msg.ReplyMarkup == nil
+	})).Return(tgbotapi.Message{}, nil).Once()
+
+	config := BotConfig{
+		Name:        "testbot",
+		UserChats:   []string{"allowed_user"},
+		GroupChats:  []int64{12345, 67890},
+		UseShowMore: false,
+	}
+
+	bot := NewBot(mockBotAPI, config, mockSplitter, mockLogger)
+	err := bot.send(12345, "testuser", 1, []string{"message part 1", "message part 2"})
+
+	assert.NoError(t, err)
+	mockBotAPI.AssertExpectations(t)
+
+	// Check that no chunks were stored when not using Show More
+	bot.chunksMutex.RLock()
+	_, exists := bot.pendingChunks["12345:testuser"]
+	bot.chunksMutex.RUnlock()
+
+	assert.False(t, exists)
+}
+
+// Also update other tests to use the new constructor
+func TestSend_SingleChunk(t *testing.T) {
+	mockBotAPI := new(MockBotAPI)
+	mockSplitter := new(MockSplitter)
+	mockLogger := new(MockLogger)
+
+	// Expect a single message without button
+	mockBotAPI.On("Send", mock.MatchedBy(func(c tgbotapi.Chattable) bool {
+		msg, ok := c.(tgbotapi.MessageConfig)
+		return ok && msg.Text == "single message" && msg.ReplyMarkup == nil
+	})).Return(tgbotapi.Message{}, nil).Once()
+
+	config := BotConfig{
+		Name:        "testbot",
+		UserChats:   []string{"allowed_user"},
+		GroupChats:  []int64{12345, 67890},
+		UseShowMore: true, // Even with show more enabled, single chunks have no buttons
+	}
+
+	bot := NewBot(mockBotAPI, config, mockSplitter, mockLogger)
+	err := bot.send(12345, "testuser", 1, []string{"single message"})
+
+	assert.NoError(t, err)
+	mockBotAPI.AssertExpectations(t)
+}
+
+// Add a test for callback query handling
+func TestBot_handleCallbackQuery(t *testing.T) {
+	mockBotAPI := new(MockBotAPI)
+	mockSplitter := new(MockSplitter)
+	mockLogger := new(MockLogger)
+
+	// Create a bot with pending chunks
+	config := BotConfig{
+		Name:        "testbot",
+		UserChats:   []string{"allowed_user"},
+		GroupChats:  []int64{12345, 67890},
+		UseShowMore: true,
+	}
+
+	bot := NewBot(mockBotAPI, config, mockSplitter, mockLogger)
+
+	// Set up pending chunks for test
+	bot.chunksMutex.Lock()
+	bot.pendingChunks["12345:testuser"] = &ChunkQueue{
+		Chunks:     []string{"chunk 1", "chunk 2", "chunk 3"},
+		Position:   1, // Already sent chunk 1
+		OriginalID: 100,
+	}
+	bot.chunksMutex.Unlock()
+
+	// Mock expectations
+	// 1. Send the next chunk (chunk 2)
+	mockBotAPI.On("Send", mock.MatchedBy(func(c tgbotapi.Chattable) bool {
+		msg, ok := c.(tgbotapi.MessageConfig)
+		return ok && msg.Text == "chunk 2" && msg.ReplyMarkup != nil
+	})).Return(tgbotapi.Message{}, nil).Once()
+
+	// 2. Send callback acknowledgement
+	mockBotAPI.On("Send", mock.MatchedBy(func(c tgbotapi.Chattable) bool {
+		_, ok := c.(tgbotapi.CallbackConfig)
+		return ok
+	})).Return(tgbotapi.Message{}, nil).Once()
+
+	// Create callback query
+	query := &tgbotapi.CallbackQuery{
+		ID: "callback123",
+		From: &tgbotapi.User{
+			UserName: "testuser",
+		},
+		Message: &tgbotapi.Message{
+			Chat: &tgbotapi.Chat{
+				ID: 12345,
+			},
+		},
+		Data: "show_more",
+	}
+
+	// Handle the callback
+	bot.handleCallbackQuery(query)
+
+	// Verify expectations
+	mockBotAPI.AssertExpectations(t)
+
+	// Check position was incremented
+	bot.chunksMutex.RLock()
+	position := bot.pendingChunks["12345:testuser"].Position
+	bot.chunksMutex.RUnlock()
+	assert.Equal(t, 2, position)
 }
 
 func TestSend_Error(t *testing.T) {
@@ -118,8 +276,16 @@ func TestSend_Error(t *testing.T) {
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
 
-	bot := NewBot(mockBotAPI, "testbot", []string{"allowed_user"}, []int64{12345, 67890}, mockSplitter, mockLogger)
-	err := bot.send(12345, 1, []string{"response message"})
+	config := BotConfig{
+		Name:        "testbot",
+		UserChats:   []string{"allowed_user"},
+		GroupChats:  []int64{12345, 67890},
+		UseShowMore: true,
+	}
+
+	bot := NewBot(mockBotAPI, config, mockSplitter, mockLogger)
+	// Fix: Add username parameter to match the updated function signature
+	err := bot.send(12345, "testuser", 1, []string{"response message"})
 
 	assert.Error(t, err)
 	mockBotAPI.AssertExpectations(t)
@@ -134,8 +300,9 @@ func TestBot_handleUpdate_Success(t *testing.T) {
 	mockLogger.On("Info", "Incoming message", []interface{}{
 		"chat_id", int64(11111), "from_user", "testuser", "text", "test message",
 	}).Return(nil)
+	// Update mock to include chunks_count
 	mockLogger.On("Info", "Outgoing message", []interface{}{
-		"chat_id", int64(11111), "reply_to_message_id", 0, "text", "response message",
+		"chat_id", int64(11111), "reply_to_message_id", 0, "text", "response message", "chunks_count", 1,
 	}).Return(nil)
 
 	mockAssistant.On("Ask", "testuser", "test message").Return("response message", nil)
@@ -151,7 +318,13 @@ func TestBot_handleUpdate_Success(t *testing.T) {
 		},
 	}
 
-	bot := NewBot(mockBotAPI, "testbot", []string{"testuser"}, []int64{12345, 67890}, mockSplitter, mockLogger)
+	config := BotConfig{
+		Name:        "testbot",
+		UserChats:   []string{"testuser"},
+		GroupChats:  []int64{12345, 67890},
+		UseShowMore: true,
+	}
+	bot := NewBot(mockBotAPI, config, mockSplitter, mockLogger)
 	bot.handleUpdate(update, mockAssistant)
 
 	mockLogger.AssertExpectations(t)
@@ -168,8 +341,9 @@ func TestBot_handleUpdate_Success_GroupChat(t *testing.T) {
 	mockLogger.On("Info", "Incoming message", []interface{}{
 		"chat_id", int64(67890), "from_user", "testuser", "text", "testbot hello",
 	}).Return(nil)
+	// Update mock to include chunks_count
 	mockLogger.On("Info", "Outgoing message", []interface{}{
-		"chat_id", int64(67890), "reply_to_message_id", 0, "text", "response message",
+		"chat_id", int64(67890), "reply_to_message_id", 0, "text", "response message", "chunks_count", 1,
 	}).Return(nil)
 
 	mockAssistant.On("Ask", "testuser", "hello").Return("response message", nil)
@@ -185,7 +359,13 @@ func TestBot_handleUpdate_Success_GroupChat(t *testing.T) {
 		},
 	}
 
-	bot := NewBot(mockBotAPI, "testbot", []string{"testuser"}, []int64{12345, 67890}, mockSplitter, mockLogger)
+	config := BotConfig{
+		Name:        "testbot",
+		UserChats:   []string{"testuser"},
+		GroupChats:  []int64{12345, 67890},
+		UseShowMore: true,
+	}
+	bot := NewBot(mockBotAPI, config, mockSplitter, mockLogger)
 	bot.handleUpdate(update, mockAssistant)
 
 	mockLogger.AssertExpectations(t)
@@ -215,7 +395,13 @@ func TestBot_handleUpdate_ParseError_GroupChatNoPrefix(t *testing.T) {
 		},
 	}
 
-	bot := NewBot(mockBotAPI, "testbot", []string{"testuser"}, []int64{12345, 67890}, mockSplitter, mockLogger)
+	config := BotConfig{
+		Name:        "testbot",
+		UserChats:   []string{"testuser"},
+		GroupChats:  []int64{12345, 67890},
+		UseShowMore: true,
+	}
+	bot := NewBot(mockBotAPI, config, mockSplitter, mockLogger)
 	bot.handleUpdate(update, mockAssistant)
 
 	mockLogger.AssertExpectations(t)
@@ -244,7 +430,13 @@ func TestBot_handleUpdate_ParseError(t *testing.T) {
 		},
 	}
 
-	bot := NewBot(mockBotAPI, "testbot", []string{}, []int64{12345, 67890}, mockSplitter, mockLogger) // Empty userChats list to force parse error
+	config := BotConfig{
+		Name:        "testbot",
+		UserChats:   []string{},
+		GroupChats:  []int64{12345, 67890},
+		UseShowMore: true,
+	}
+	bot := NewBot(mockBotAPI, config, mockSplitter, mockLogger) // Empty userChats list to force parse error
 	bot.handleUpdate(update, mockAssistant)
 
 	mockLogger.AssertExpectations(t)
@@ -275,7 +467,13 @@ func TestBot_handleUpdate_AskError(t *testing.T) {
 		},
 	}
 
-	bot := NewBot(mockBotAPI, "testbot", []string{"testuser"}, []int64{12345, 67890}, mockSplitter, mockLogger)
+	config := BotConfig{
+		Name:        "testbot",
+		UserChats:   []string{"testuser"},
+		GroupChats:  []int64{12345, 67890},
+		UseShowMore: true,
+	}
+	bot := NewBot(mockBotAPI, config, mockSplitter, mockLogger)
 	bot.handleUpdate(update, mockAssistant)
 
 	mockLogger.AssertExpectations(t)
@@ -292,8 +490,9 @@ func TestBot_handleUpdate_SendError(t *testing.T) {
 	mockLogger.On("Info", "Incoming message", []interface{}{
 		"chat_id", int64(11111), "from_user", "testuser", "text", "test message",
 	}).Return(nil)
+	// Update mock expectation to include chunks_count parameter
 	mockLogger.On("Info", "Outgoing message", []interface{}{
-		"chat_id", int64(11111), "reply_to_message_id", 0, "text", "response message",
+		"chat_id", int64(11111), "reply_to_message_id", 0, "text", "response message", "chunks_count", 1,
 	}).Return(nil)
 	mockLogger.On("Error", "Send error", []interface{}{
 		"chat_id", int64(11111), "from_user", "testuser", "error", assert.AnError,
@@ -311,7 +510,13 @@ func TestBot_handleUpdate_SendError(t *testing.T) {
 		},
 	}
 
-	bot := NewBot(mockBotAPI, "testbot", []string{"testuser"}, []int64{12345, 67890}, mockSplitter, mockLogger)
+	config := BotConfig{
+		Name:        "testbot",
+		UserChats:   []string{"testuser"},
+		GroupChats:  []int64{12345, 67890},
+		UseShowMore: true,
+	}
+	bot := NewBot(mockBotAPI, config, mockSplitter, mockLogger)
 	bot.handleUpdate(update, mockAssistant)
 
 	mockLogger.AssertExpectations(t)
@@ -328,7 +533,13 @@ func TestBot_handleUpdate_NilMessage(t *testing.T) {
 		Message: nil,
 	}
 
-	bot := NewBot(mockBotAPI, "testbot", []string{"allowed_user"}, []int64{12345, 67890}, mockSplitter, mockLogger)
+	config := BotConfig{
+		Name:        "testbot",
+		UserChats:   []string{"allowed_user"},
+		GroupChats:  []int64{12345, 67890},
+		UseShowMore: true,
+	}
+	bot := NewBot(mockBotAPI, config, mockSplitter, mockLogger)
 	bot.handleUpdate(update, mockAssistant)
 
 	mockAssistant.AssertExpectations(t)
@@ -345,8 +556,9 @@ func TestBot_HandleMessages(t *testing.T) {
 	mockLogger.On("Info", "Incoming message", []interface{}{
 		"chat_id", int64(11111), "from_user", "testuser", "text", "test message",
 	}).Return(nil)
+	// Update this mock expectation too to include chunks_count parameter
 	mockLogger.On("Info", "Outgoing message", []interface{}{
-		"chat_id", int64(11111), "reply_to_message_id", 0, "text", "response message",
+		"chat_id", int64(11111), "reply_to_message_id", 0, "text", "response message", "chunks_count", 1,
 	}).Return(nil)
 
 	mockBotAPI.On("GetUpdatesChan", mock.Anything).Return((tgbotapi.UpdatesChannel)(mockUpdates))
@@ -354,7 +566,13 @@ func TestBot_HandleMessages(t *testing.T) {
 	mockSplitter.On("Split", "response message").Return([]string{"response message"}, nil)
 	mockBotAPI.On("Send", mock.Anything).Return(tgbotapi.Message{}, nil)
 
-	bot := NewBot(mockBotAPI, "testbot", []string{"testuser"}, []int64{12345, 67890}, mockSplitter, mockLogger)
+	config := BotConfig{
+		Name:        "testbot",
+		UserChats:   []string{"testuser"},
+		GroupChats:  []int64{12345, 67890},
+		UseShowMore: true,
+	}
+	bot := NewBot(mockBotAPI, config, mockSplitter, mockLogger)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
