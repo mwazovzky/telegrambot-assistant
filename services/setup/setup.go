@@ -60,6 +60,7 @@ func InitLogger(cfg config.LokiConfig, service string) *cloudlog.Logger {
 	return cloudlog.NewLogger(client, service)
 }
 
+// Update InitBot to use the new Bot constructor with BotConfig
 func InitBot(cfg config.TelegramConfig, logger bot.Logger) (*bot.Bot, error) {
 	telegramBot, err := newBotAPI(cfg.ApiToken)
 	if err != nil {
@@ -70,5 +71,13 @@ func InitBot(cfg config.TelegramConfig, logger bot.Logger) (*bot.Bot, error) {
 
 	splitter := textsplitter.NewTextSplitter(cfg.MessageLimit)
 
-	return bot.NewBot(telegramBot, cfg.BotName, cfg.Users, cfg.Chats, splitter, logger), nil
+	// Create bot config struct
+	botConfig := bot.BotConfig{
+		Name:        cfg.BotName,
+		UserChats:   cfg.Users,
+		GroupChats:  cfg.Chats,
+		UseShowMore: cfg.ShowMore, // Updated to use the renamed field
+	}
+
+	return bot.NewBot(telegramBot, botConfig, splitter, logger), nil
 }
