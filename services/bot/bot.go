@@ -9,6 +9,28 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
+const (
+	// Callback actions
+	ShowMoreCallback = "show_more"
+
+	// Error messages
+	ErrAssistantResponse = "Sorry, I'm having trouble generating a response right now. Please try again later."
+	ErrSplittingResponse = "Sorry, I'm having trouble processing my response. Please try a simpler query."
+	ErrSendingResponse   = "Sorry, I'm having trouble sending my response. Please try again later."
+	ErrLoadingNextPart   = "Sorry, I couldn't load the next part of the message. Please try again."
+	ErrNoMoreContent     = "No more content available"
+	ErrFailedLoadMore    = "Failed to load more content"
+
+	// Log keys
+	LogKeyChatID       = "chat_id"
+	LogKeyFromUser     = "from_user"
+	LogKeyText         = "text"
+	LogKeyError        = "error"
+	LogKeyChunks       = "chunks"
+	LogKeyChunksCount  = "chunks_count"
+	LogKeyReplyToMsgID = "reply_to_message_id"
+)
+
 type Assistant interface {
 	Ask(username string, request string) (response string, err error)
 }
@@ -28,13 +50,6 @@ type Logger interface {
 	Debug(message string, keyValues ...interface{}) error
 }
 
-// ChunkQueue maintains pending chunks for a specific conversation
-type ChunkQueue struct {
-	Chunks     []string
-	Position   int
-	OriginalID int
-}
-
 type Bot struct {
 	botApi      BotAPI
 	name        string
@@ -42,7 +57,7 @@ type Bot struct {
 	groupChats  []int64
 	splitter    Splitter
 	logger      Logger
-	useShowMore bool // Renamed from useShowMoreInterface
+	useShowMore bool
 
 	// Map to store message chunks: chatID+username → ChunkQueue
 	pendingChunks map[string]*ChunkQueue
@@ -54,7 +69,7 @@ type BotConfig struct {
 	Name        string
 	UserChats   []string
 	GroupChats  []int64
-	UseShowMore bool // Renamed from UseShowMoreInterface
+	UseShowMore bool
 }
 
 func NewBot(botApi BotAPI, config BotConfig, splitter Splitter, logger Logger) *Bot {
@@ -63,7 +78,7 @@ func NewBot(botApi BotAPI, config BotConfig, splitter Splitter, logger Logger) *
 		name:          config.Name,
 		userChats:     config.UserChats,
 		groupChats:    config.GroupChats,
-		useShowMore:   config.UseShowMore, // Renamed
+		useShowMore:   config.UseShowMore,
 		splitter:      splitter,
 		logger:        logger,
 		pendingChunks: make(map[string]*ChunkQueue),
@@ -89,12 +104,12 @@ func (b *Bot) HandleMessages(assistant Assistant) {
 
 func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) {
 	// Parse callback data
-	if query.Data == "show_more" {
+	if query.Data == ShowMoreCallback {
 		chatID := query.Message.Chat.ID
 		username := query.From.UserName
 
 		// Get conversation key
-		convKey := fmt.Sprintf("%d:%s", chatID, username)
+		convKey := conversationKey(chatID, username)
 
 		b.chunksMutex.Lock()
 		defer b.chunksMutex.Unlock()
@@ -102,7 +117,7 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) {
 		queue, exists := b.pendingChunks[convKey]
 		if !exists || queue.Position >= len(queue.Chunks) {
 			// No more chunks available
-			callback := tgbotapi.NewCallback(query.ID, "No more content available")
+			callback := tgbotapi.NewCallback(query.ID, ErrNoMoreContent)
 			_, _ = b.botApi.Send(callback)
 			return
 		}
@@ -113,17 +128,21 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) {
 
 		// Add button if there are more chunks
 		if queue.Position < len(queue.Chunks)-1 {
-			keyboard := tgbotapi.NewInlineKeyboardMarkup(
-				tgbotapi.NewInlineKeyboardRow(
-					tgbotapi.NewInlineKeyboardButtonData("Show More", "show_more"),
-				),
-			)
-			msg.ReplyMarkup = keyboard
+			msg.ReplyMarkup = createShowMoreKeyboard()
 		}
 
 		_, err := b.botApi.Send(msg)
 		if err != nil {
-			b.logger.Error("Failed to send next chunk", "error", err, "chat_id", chatID)
+			b.logger.Error("Failed to send next chunk", LogKeyError, err, LogKeyChatID, chatID)
+
+			// Send error message about the failure
+			errorMsg := tgbotapi.NewMessage(chatID, ErrLoadingNextPart)
+			_, _ = b.botApi.Send(errorMsg)
+
+			// Still acknowledge the callback to remove the loading indicator
+			callback := tgbotapi.NewCallback(query.ID, ErrFailedLoadMore)
+			_, _ = b.botApi.Send(callback)
+			return
 		}
 
 		// Acknowledge the callback query
@@ -141,43 +160,62 @@ func (b *Bot) handleUpdate(update tgbotapi.Update, assistant Assistant) {
 		return
 	}
 
-	b.logger.Info("Incoming message", "chat_id", msg.Chat.ID, "from_user", msg.From.UserName, "text", msg.Text)
+	b.logger.Info("Incoming message", LogKeyChatID, msg.Chat.ID, LogKeyFromUser, msg.From.UserName, LogKeyText, msg.Text)
 
 	req, err := b.parse(msg.Chat.ID, msg.From.UserName, msg.Text)
 	if err != nil {
-		b.logger.Error("Parse error", "chat_id", msg.Chat.ID, "from_user", msg.From.UserName, "error", err)
+		b.logger.Error("Parse error", LogKeyChatID, msg.Chat.ID, LogKeyFromUser, msg.From.UserName, LogKeyError, err)
+		// We don't send error feedback for parse errors to avoid responding to messages not intended for the bot
 		return
 	}
 
 	text, err := assistant.Ask(msg.From.UserName, req)
 	if err != nil {
-		b.logger.Error("Assistant error", "chat_id", msg.Chat.ID, "from_user", msg.From.UserName, "error", err)
+		b.logger.Error("Assistant error", LogKeyChatID, msg.Chat.ID, LogKeyFromUser, msg.From.UserName, LogKeyError, err)
+		// Send error feedback to user
+		b.sendErrorMessage(msg.Chat.ID, msg.MessageID, ErrAssistantResponse)
 		return
 	}
 
 	chunks, err := b.splitter.Split(text)
 	if err != nil {
-		b.logger.Error("Splitter error", "chat_id", msg.Chat.ID, "from_user", msg.From.UserName, "error", err, "text", text, "chunks", chunks)
+		b.logger.Error("Splitter error", LogKeyChatID, msg.Chat.ID, LogKeyFromUser, msg.From.UserName, LogKeyError, err, LogKeyText, text, LogKeyChunks, chunks)
+		// Send error feedback to user
+		b.sendErrorMessage(msg.Chat.ID, msg.MessageID, ErrSplittingResponse)
 		return
 	}
 
-	b.logger.Info("Outgoing message", "chat_id", msg.Chat.ID, "reply_to_message_id", msg.MessageID, "text", text, "chunks_count", len(chunks))
+	b.logger.Info("Outgoing message", LogKeyChatID, msg.Chat.ID, LogKeyReplyToMsgID, msg.MessageID, LogKeyText, text, LogKeyChunksCount, len(chunks))
 
 	err = b.send(msg.Chat.ID, msg.From.UserName, msg.MessageID, chunks)
 	if err != nil {
-		b.logger.Error("Send error", "chat_id", msg.Chat.ID, "from_user", msg.From.UserName, "error", err)
+		b.logger.Error("Send error", LogKeyChatID, msg.Chat.ID, LogKeyFromUser, msg.From.UserName, LogKeyError, err)
+		// Send error feedback to user
+		b.sendErrorMessage(msg.Chat.ID, msg.MessageID, ErrSendingResponse)
 		return
+	}
+}
+
+// sendErrorMessage sends an error message to the user
+func (b *Bot) sendErrorMessage(chatID int64, replyToID int, message string) {
+	msg := tgbotapi.NewMessage(chatID, message)
+	msg.ReplyToMessageID = replyToID
+
+	// Try to send the error message, but don't worry if this also fails
+	_, err := b.botApi.Send(msg)
+	if err != nil {
+		b.logger.Error("Failed to send error message", LogKeyChatID, chatID, LogKeyError, err)
 	}
 }
 
 func (b *Bot) parse(chatID int64, username string, txt string) (string, error) {
 	// handle user chat message
-	if slices.Contains(b.userChats, username) && !slices.Contains(b.groupChats, chatID) {
+	if b.isAuthorizedUser(username) && !b.isAuthorizedGroup(chatID) {
 		return txt, nil
 	}
 
 	// handle group chat message
-	if slices.Contains(b.groupChats, chatID) && strings.HasPrefix(txt, b.name) {
+	if b.isAuthorizedGroup(chatID) && strings.HasPrefix(txt, b.name) {
 		// Remove the bot's name and any leading symbols
 		trimmedSymbols := "!, "
 		trimmedText := strings.TrimPrefix(txt, b.name)
@@ -212,12 +250,7 @@ func (b *Bot) send(chatID int64, username string, messageID int, chunks []string
 	msg.ReplyToMessageID = messageID
 
 	// Add a "Show More" button if there are more chunks
-	keyboard := tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("Show More", "show_more"),
-		),
-	)
-	msg.ReplyMarkup = keyboard
+	msg.ReplyMarkup = createShowMoreKeyboard()
 
 	_, err := b.botApi.Send(msg)
 	if err != nil {
@@ -225,7 +258,7 @@ func (b *Bot) send(chatID int64, username string, messageID int, chunks []string
 	}
 
 	// Store the remaining chunks in the queue
-	convKey := fmt.Sprintf("%d:%s", chatID, username)
+	convKey := conversationKey(chatID, username)
 
 	b.chunksMutex.Lock()
 	b.pendingChunks[convKey] = &ChunkQueue{
@@ -236,4 +269,28 @@ func (b *Bot) send(chatID int64, username string, messageID int, chunks []string
 	b.chunksMutex.Unlock()
 
 	return nil
+}
+
+// conversationKey generates a unique key for storing conversation chunks
+func conversationKey(chatID int64, username string) string {
+	return fmt.Sprintf("%d:%s", chatID, username)
+}
+
+// createShowMoreKeyboard creates a keyboard with a "Show More" button
+func createShowMoreKeyboard() tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("Show More", ShowMoreCallback),
+		),
+	)
+}
+
+// isAuthorizedUser checks if a user is authorized to use the bot in private chats
+func (b *Bot) isAuthorizedUser(username string) bool {
+	return slices.Contains(b.userChats, username)
+}
+
+// isAuthorizedGroup checks if a group is authorized to use the bot
+func (b *Bot) isAuthorizedGroup(chatID int64) bool {
+	return slices.Contains(b.groupChats, chatID)
 }

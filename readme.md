@@ -24,7 +24,13 @@ Send a message directly to the bot in a private chat. The bot will respond if yo
 
 ### Group Chat
 
-In group chats, invite bot to the chat, mention the bot by name at the beginning of your message
+In group chats, invite bot to the chat, mention the bot by name at the beginning of your message.
+
+### Error Handling
+
+The bot provides helpful error messages in case of issues, specifically when the AI service is unavailable, you'll receive a notification.
+
+These error message helps user understand that something is wrong instead of leaving user wondering why the bot isn't responding.
 
 ## Setup
 
