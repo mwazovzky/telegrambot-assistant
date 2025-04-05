@@ -14,6 +14,7 @@ func clearTestEnv() {
 	os.Unsetenv("TELEGRAM_USER_CHATS")
 	os.Unsetenv("TELEGRAM_GROUP_CHATS")
 	os.Unsetenv("TELEGRAM_MESSAGE_LIMIT")
+	os.Unsetenv("TELEGRAM_SHOW_MORE")
 
 	os.Unsetenv("OPENAI_API_URL")
 	os.Unsetenv("OPENAI_API_KEY")
@@ -39,6 +40,7 @@ func setupTestEnv() {
 	os.Setenv("TELEGRAM_USER_CHATS", "user1,user2,user3")
 	os.Setenv("TELEGRAM_GROUP_CHATS", "12345,67890")
 	os.Setenv("TELEGRAM_MESSAGE_LIMIT", "4096")
+	os.Setenv("TELEGRAM_SHOW_MORE", "true")
 
 	os.Setenv("OPENAI_API_URL", "https://api.openai.com")
 	os.Setenv("OPENAI_API_KEY", "test_api_key")
@@ -127,4 +129,42 @@ func TestLoadInvalidValues(t *testing.T) {
 	cfg, err := Load()
 	assert.Error(t, err)
 	assert.Nil(t, cfg)
+}
+
+func TestTelegramShowMoreDefault(t *testing.T) {
+	// Clean environment before test
+	clearTestEnv()
+
+	// Set other required environment variables without TELEGRAM_SHOW_MORE
+	setupTestEnv()
+	os.Unsetenv("TELEGRAM_SHOW_MORE") // Explicitly unset to test default value
+
+	cfg, err := Load()
+	assert.NoError(t, err)
+	assert.NotNil(t, cfg)
+
+	// The default value is true as specified in the struct tag `default:"true"`
+	assert.Equal(t, true, cfg.Telegram.ShowMore)
+}
+
+func TestTelegramShowMoreExplicit(t *testing.T) {
+	// Clean environment before test
+	clearTestEnv()
+
+	// Set all required environment variables
+	setupTestEnv()
+
+	// Test with explicit false value
+	os.Setenv("TELEGRAM_SHOW_MORE", "false")
+	cfg, err := Load()
+	assert.NoError(t, err)
+	assert.NotNil(t, cfg)
+	assert.Equal(t, false, cfg.Telegram.ShowMore)
+
+	// Test with explicit true value
+	os.Setenv("TELEGRAM_SHOW_MORE", "true")
+	cfg, err = Load()
+	assert.NoError(t, err)
+	assert.NotNil(t, cfg)
+	assert.Equal(t, true, cfg.Telegram.ShowMore)
 }
