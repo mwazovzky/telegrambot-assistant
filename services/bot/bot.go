@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-	"sync"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -51,17 +50,14 @@ type Logger interface {
 }
 
 type Bot struct {
-	botApi      BotAPI
-	name        string
-	userChats   []string
-	groupChats  []int64
-	splitter    Splitter
-	logger      Logger
-	useShowMore bool
-
-	// Map to store message chunks: chatID+username → ChunkQueue
-	pendingChunks map[string]*ChunkQueue
-	chunksMutex   sync.RWMutex
+	botApi       BotAPI
+	name         string
+	userChats    []string
+	groupChats   []int64
+	splitter     Splitter
+	logger       Logger
+	useShowMore  bool
+	chunkStorage ChunkStorage
 }
 
 // BotConfig holds configuration options for the Bot
@@ -73,15 +69,21 @@ type BotConfig struct {
 }
 
 func NewBot(botApi BotAPI, config BotConfig, splitter Splitter, logger Logger) *Bot {
+	// Create default in-memory storage if not provided
+	return NewBotWithChunkStorage(botApi, config, splitter, logger, NewInMemoryChunkStorage())
+}
+
+// New constructor that accepts custom chunk storage
+func NewBotWithChunkStorage(botApi BotAPI, config BotConfig, splitter Splitter, logger Logger, chunkStorage ChunkStorage) *Bot {
 	return &Bot{
-		botApi:        botApi,
-		name:          config.Name,
-		userChats:     config.UserChats,
-		groupChats:    config.GroupChats,
-		useShowMore:   config.UseShowMore,
-		splitter:      splitter,
-		logger:        logger,
-		pendingChunks: make(map[string]*ChunkQueue),
+		botApi:       botApi,
+		name:         config.Name,
+		userChats:    config.UserChats,
+		groupChats:   config.GroupChats,
+		useShowMore:  config.UseShowMore,
+		splitter:     splitter,
+		logger:       logger,
+		chunkStorage: chunkStorage,
 	}
 }
 
@@ -108,14 +110,8 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) {
 		chatID := query.Message.Chat.ID
 		username := query.From.UserName
 
-		// Get conversation key
-		convKey := conversationKey(chatID, username)
-
-		b.chunksMutex.Lock()
-		defer b.chunksMutex.Unlock()
-
-		queue, exists := b.pendingChunks[convKey]
-		if !exists || queue.Position >= len(queue.Chunks) {
+		chunk, originalID, hasMore, exists := b.chunkStorage.GetNextChunk(chatID, username)
+		if !exists {
 			// No more chunks available
 			callback := tgbotapi.NewCallback(query.ID, ErrNoMoreContent)
 			_, _ = b.botApi.Send(callback)
@@ -123,11 +119,11 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) {
 		}
 
 		// Send next chunk
-		msg := tgbotapi.NewMessage(chatID, queue.Chunks[queue.Position])
-		msg.ReplyToMessageID = queue.OriginalID
+		msg := tgbotapi.NewMessage(chatID, chunk)
+		msg.ReplyToMessageID = originalID
 
 		// Add button if there are more chunks
-		if queue.Position < len(queue.Chunks)-1 {
+		if hasMore {
 			msg.ReplyMarkup = createShowMoreKeyboard()
 		}
 
@@ -148,9 +144,6 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) {
 		// Acknowledge the callback query
 		callback := tgbotapi.NewCallback(query.ID, "")
 		_, _ = b.botApi.Send(callback)
-
-		// Move to next chunk
-		queue.Position++
 	}
 }
 
@@ -236,6 +229,8 @@ func (b *Bot) send(chatID int64, username string, messageID int, chunks []string
 		for _, chunk := range chunks {
 			msg := tgbotapi.NewMessage(chatID, chunk)
 			msg.ReplyToMessageID = messageID
+			// Ensure no ReplyMarkup is set when not using Show More
+			msg.ReplyMarkup = nil
 			_, err := b.botApi.Send(msg)
 			if err != nil {
 				return err
@@ -257,23 +252,10 @@ func (b *Bot) send(chatID int64, username string, messageID int, chunks []string
 		return err
 	}
 
-	// Store the remaining chunks in the queue
-	convKey := conversationKey(chatID, username)
-
-	b.chunksMutex.Lock()
-	b.pendingChunks[convKey] = &ChunkQueue{
-		Chunks:     chunks,
-		Position:   1, // Start from second chunk (index 1)
-		OriginalID: messageID,
-	}
-	b.chunksMutex.Unlock()
+	// Store the remaining chunks in the storage
+	b.chunkStorage.StoreChunks(chatID, username, messageID, chunks)
 
 	return nil
-}
-
-// conversationKey generates a unique key for storing conversation chunks
-func conversationKey(chatID int64, username string) string {
-	return fmt.Sprintf("%d:%s", chatID, username)
 }
 
 // createShowMoreKeyboard creates a keyboard with a "Show More" button

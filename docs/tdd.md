@@ -14,6 +14,11 @@ The TelegramBot Assistant follows a modular architecture with clear separation o
                          ┌───────────────┐                │
                          │ Text Splitter │                │
                          └───────────────┘                │
+                                │                         │
+                                ▼                         │
+                         ┌───────────────┐                │
+                         │ Chunk Storage │                │
+                         └───────────────┘                │
                                                           │
 ┌─────────────────┐      ┌───────────────┐                │
 │  Config Service │◄────►│ Redis Storage │◄───────────────┘
@@ -119,6 +124,39 @@ The Configuration Service manages all app settings:
 - Secure management of API tokens and keys
 - Feature flags like "Show More" functionality
 
+### 6. Chunk Storage Service
+
+The Chunk Storage Service handles storing and retrieving message chunks for the "Show More" functionality:
+
+- Provides an abstract interface for storage implementations
+- Manages message chunks across multiple conversations
+- Supports retrieval of chunks for incremental display
+
+#### Key Interfaces
+
+```go
+type ChunkStorage interface {
+    StoreChunks(chatID int64, username string, messageID int, chunks []string)
+    GetNextChunk(chatID int64, username string) (chunk string, originalID int, hasMore bool, exists bool)
+    HasChunks(chatID int64, username string) bool
+}
+```
+
+#### Implementations
+
+1. **InMemoryChunkStorage**: Default implementation that stores chunks in memory
+   - Fast access but doesn't persist across restarts
+   - Suitable for development or low-traffic bots
+2. **RedisChunkStorage**: (Future implementation)
+
+   - Distributed storage supporting multiple bot instances
+   - Built-in TTL support for automatic cleanup
+   - Persistence across service restarts
+
+3. **DatabaseChunkStorage**: (Future implementation)
+   - Long-term retention and analytics
+   - Support for complex queries and historical data
+
 ## Key Workflows
 
 ### 1. Message Processing Flow
@@ -137,10 +175,12 @@ The Configuration Service manages all app settings:
 
 1. User clicks "Show More" button
 2. Callback query received by Bot service
-3. Associated message chunks retrieved from queue
-4. Next chunk sent to user
-5. If more chunks exist, new "Show More" button attached
-6. Queue position updated
+3. Bot requests next chunk from ChunkStorage service
+4. If chunk exists:
+   - Next chunk sent to user
+   - If more chunks exist, new "Show More" button attached
+5. If no chunk exists or error occurs:
+   - Error message sent to user
 
 ## Configuration Parameters
 
@@ -209,3 +249,35 @@ The bot implements comprehensive error handling with specific strategies for:
 2. **Database Migration** - Potential move to more robust persistence
 3. **Plugin System** - Architecture to support third-party extensions
 4. **API Gateway** - For advanced request routing and management
+
+## Migration Paths
+
+### Chunk Storage Migration
+
+As the bot's usage grows, the following storage migration path is recommended:
+
+1. **Phase 1** (Development/Low Traffic): InMemoryChunkStorage
+
+   - Simple implementation, minimal dependencies
+   - No persistence across restarts
+   - Limited by memory constraints
+
+2. **Phase 2** (Production/Medium Traffic): RedisChunkStorage
+
+   - TTL-based expiration for automatic resource management
+   - Supports horizontal scaling across multiple bot instances
+   - Persistence across service restarts
+
+3. **Phase 3** (High Traffic/Analytics): DatabaseChunkStorage
+   - Long-term data retention
+   - Support for usage analytics and reporting
+   - More robust transaction management
+
+## Scaling Considerations
+
+### Chunk Storage Scaling
+
+1. **Memory Management**: Move from in-memory to Redis-based storage
+2. **TTL Policies**: Implement automatic expiration for inactive conversations
+3. **Horizontal Scaling**: Use distributed storage to support multiple bot instances
+4. **Failure Recovery**: Ensure chunks can be recovered or gracefully expire after crashes

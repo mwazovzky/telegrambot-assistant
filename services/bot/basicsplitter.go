@@ -1,4 +1,5 @@
-package textsplitter
+// Renamed from: /Users/alex/code/telegrambot-assistant/services/bot/textsplitter.go
+package bot
 
 import (
 	"fmt"
@@ -7,15 +8,17 @@ import (
 
 const newLine = "\n"
 
-type TextSplitter struct {
+// BasicSplitter implements a simple line-based text splitter
+type BasicSplitter struct {
 	limit int
 }
 
-func NewTextSplitter(limit int) *TextSplitter {
-	return &TextSplitter{limit: limit}
+// NewBasicSplitter creates a new BasicSplitter with the specified size limit
+func NewBasicSplitter(limit int) *BasicSplitter {
+	return &BasicSplitter{limit: limit}
 }
 
-func (s *TextSplitter) Split(text string) ([]string, error) {
+func (s *BasicSplitter) Split(text string) ([]string, error) {
 	if len(text) == 0 {
 		return nil, fmt.Errorf("validation error: empty text")
 	}

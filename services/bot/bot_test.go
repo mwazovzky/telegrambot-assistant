@@ -1,3 +1,6 @@
+// Package bot contains the core Telegram bot functionality and tests.
+// bot_test contains tests for the Telegram bot functionality including message handling,
+// chunk storage, and user interaction flows.
 package bot
 
 import (
@@ -73,6 +76,25 @@ func (m *MockLogger) Debug(message string, keyValues ...interface{}) error {
 	return args.Error(0)
 }
 
+// Add a MockChunkStorage implementation
+type MockChunkStorage struct {
+	mock.Mock
+}
+
+func (m *MockChunkStorage) StoreChunks(chatID int64, username string, messageID int, chunks []string) {
+	m.Called(chatID, username, messageID, chunks)
+}
+
+func (m *MockChunkStorage) GetNextChunk(chatID int64, username string) (chunk string, originalID int, hasMore bool, exists bool) {
+	args := m.Called(chatID, username)
+	return args.String(0), args.Int(1), args.Bool(2), args.Bool(3)
+}
+
+func (m *MockChunkStorage) HasChunks(chatID int64, username string) bool {
+	args := m.Called(chatID, username)
+	return args.Bool(0)
+}
+
 // Helper functions for tests
 func createTestBot(mockBotAPI BotAPI, mockSplitter Splitter, mockLogger Logger) *Bot {
 	config := BotConfig{
@@ -80,17 +102,6 @@ func createTestBot(mockBotAPI BotAPI, mockSplitter Splitter, mockLogger Logger) 
 		UserChats:   []string{testAllowedUser, testUserName},
 		GroupChats:  []int64{testGroupChatID1, testGroupChatID2},
 		UseShowMore: true,
-	}
-	return NewBot(mockBotAPI, config, mockSplitter, mockLogger)
-}
-
-// Helper to create a custom bot with specific config
-func createCustomBot(mockBotAPI BotAPI, mockSplitter Splitter, mockLogger Logger, useShowMore bool, userChats []string) *Bot {
-	config := BotConfig{
-		Name:        testBotName,
-		UserChats:   userChats,
-		GroupChats:  []int64{testGroupChatID1, testGroupChatID2},
-		UseShowMore: useShowMore,
 	}
 	return NewBot(mockBotAPI, config, mockSplitter, mockLogger)
 }
@@ -156,17 +167,22 @@ func setupMockForErrorResponse(mockBotAPI *MockBotAPI, errorMsgContains string) 
 	})).Return(tgbotapi.Message{}, nil).Once()
 }
 
+// Consider using a test helper function to avoid config duplication
+func createTestConfig() BotConfig {
+	return BotConfig{
+		Name:        testBotName,
+		UserChats:   []string{testAllowedUser, testUserName},
+		GroupChats:  []int64{testGroupChatID1, testGroupChatID2},
+		UseShowMore: true,
+	}
+}
+
 // Tests for message parsing
 func TestBot_parse(t *testing.T) {
 	mockBotAPI := new(MockBotAPI)
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
-	config := BotConfig{
-		Name:        "testbot",
-		UserChats:   []string{"allowed_user"},
-		GroupChats:  []int64{12345, 67890},
-		UseShowMore: true,
-	}
+	config := createTestConfig()
 	bot := NewBot(mockBotAPI, config, mockSplitter, mockLogger)
 	tests := []struct {
 		name     string
@@ -202,76 +218,77 @@ func TestSend_WithShowMore(t *testing.T) {
 	mockBotAPI := new(MockBotAPI)
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
+	mockChunkStorage := new(MockChunkStorage)
+
 	// Expect only the first message to be sent (with button)
 	mockBotAPI.On("Send", mock.MatchedBy(func(c tgbotapi.Chattable) bool {
 		msg, ok := c.(tgbotapi.MessageConfig)
 		return ok && msg.Text == "message part 1" && msg.ReplyMarkup != nil
 	})).Return(tgbotapi.Message{}, nil).Once()
-	config := BotConfig{
-		Name:        "testbot",
-		UserChats:   []string{"allowed_user"},
-		GroupChats:  []int64{12345, 67890},
-		UseShowMore: true,
-	}
-	bot := NewBot(mockBotAPI, config, mockSplitter, mockLogger)
+
+	// Expect chunk storage to be called
+	mockChunkStorage.On("StoreChunks", int64(12345), "testuser", 1,
+		[]string{"message part 1", "message part 2"}).Return()
+
+	config := createTestConfig()
+
+	bot := NewBotWithChunkStorage(mockBotAPI, config, mockSplitter, mockLogger, mockChunkStorage)
 	err := bot.send(12345, "testuser", 1, []string{"message part 1", "message part 2"})
+
 	assert.NoError(t, err)
 	mockBotAPI.AssertExpectations(t)
-	// Check that the chunks were stored
-	bot.chunksMutex.RLock()
-	queue, exists := bot.pendingChunks["12345:testuser"]
-	bot.chunksMutex.RUnlock()
-	assert.True(t, exists)
-	assert.Equal(t, 1, queue.Position)
-	assert.Equal(t, []string{"message part 1", "message part 2"}, queue.Chunks)
+	mockChunkStorage.AssertExpectations(t)
 }
 
 func TestSend_WithoutShowMore(t *testing.T) {
 	mockBotAPI := new(MockBotAPI)
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
-	// Expect both messages to be sent (without buttons)
+	mockChunkStorage := new(MockChunkStorage)
+
+	// Create a more precise matcher for messages without buttons
+	// Check that ReplyMarkup is explicitly nil
 	mockBotAPI.On("Send", mock.MatchedBy(func(c tgbotapi.Chattable) bool {
 		msg, ok := c.(tgbotapi.MessageConfig)
 		return ok && msg.Text == "message part 1" && msg.ReplyMarkup == nil
 	})).Return(tgbotapi.Message{}, nil).Once()
+
 	mockBotAPI.On("Send", mock.MatchedBy(func(c tgbotapi.Chattable) bool {
 		msg, ok := c.(tgbotapi.MessageConfig)
 		return ok && msg.Text == "message part 2" && msg.ReplyMarkup == nil
 	})).Return(tgbotapi.Message{}, nil).Once()
+
+	// We should not store chunks when ShowMore is disabled
+	// No expectation for mockChunkStorage.StoreChunks()
+
+	// Create a config with ShowMore explicitly set to false
 	config := BotConfig{
-		Name:        "testbot",
-		UserChats:   []string{"allowed_user"},
-		GroupChats:  []int64{12345, 67890},
-		UseShowMore: false,
+		Name:        testBotName,
+		UserChats:   []string{testAllowedUser},
+		GroupChats:  []int64{testGroupChatID1, testGroupChatID2},
+		UseShowMore: false, // Make sure this is false
 	}
-	bot := NewBot(mockBotAPI, config, mockSplitter, mockLogger)
+
+	bot := NewBotWithChunkStorage(mockBotAPI, config, mockSplitter, mockLogger, mockChunkStorage)
 	err := bot.send(12345, "testuser", 1, []string{"message part 1", "message part 2"})
+
 	assert.NoError(t, err)
 	mockBotAPI.AssertExpectations(t)
-	// Check that no chunks were stored when not using Show More
-	bot.chunksMutex.RLock()
-	_, exists := bot.pendingChunks["12345:testuser"]
-	bot.chunksMutex.RUnlock()
-	assert.False(t, exists)
+	mockChunkStorage.AssertExpectations(t)
 }
 
 func TestSend_SingleChunk(t *testing.T) {
 	mockBotAPI := new(MockBotAPI)
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
+	mockChunkStorage := new(MockChunkStorage)
 	// Expect a single message without button
 	mockBotAPI.On("Send", mock.MatchedBy(func(c tgbotapi.Chattable) bool {
 		msg, ok := c.(tgbotapi.MessageConfig)
 		return ok && msg.Text == "single message" && msg.ReplyMarkup == nil
 	})).Return(tgbotapi.Message{}, nil).Once()
-	config := BotConfig{
-		Name:        "testbot",
-		UserChats:   []string{"allowed_user"},
-		GroupChats:  []int64{12345, 67890},
-		UseShowMore: true, // Even with show more enabled, single chunks have no buttons
-	}
-	bot := NewBot(mockBotAPI, config, mockSplitter, mockLogger)
+	config := createTestConfig()
+	bot := NewBotWithChunkStorage(mockBotAPI, config, mockSplitter, mockLogger, mockChunkStorage)
 	err := bot.send(12345, "testuser", 1, []string{"single message"})
 	assert.NoError(t, err)
 	mockBotAPI.AssertExpectations(t)
@@ -282,13 +299,9 @@ func TestSend_Error(t *testing.T) {
 	mockBotAPI.On("Send", mock.Anything).Return(tgbotapi.Message{}, assert.AnError)
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
-	config := BotConfig{
-		Name:        "testbot",
-		UserChats:   []string{"allowed_user"},
-		GroupChats:  []int64{12345, 67890},
-		UseShowMore: true,
-	}
-	bot := NewBot(mockBotAPI, config, mockSplitter, mockLogger)
+	mockChunkStorage := new(MockChunkStorage)
+	config := createTestConfig()
+	bot := NewBotWithChunkStorage(mockBotAPI, config, mockSplitter, mockLogger, mockChunkStorage)
 	// Fix: Add username parameter to match the updated function signature
 	err := bot.send(12345, "testuser", 1, []string{"response message"})
 	assert.Error(t, err)
@@ -301,14 +314,18 @@ func TestBot_handleUpdate_Success(t *testing.T) {
 	mockAssistant := new(MockAssistant)
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
+	mockChunkStorage := new(MockChunkStorage)
 	// Set up expectations
 	setupLoggerExpectations(mockLogger, "incoming", testPrivateChatID, testUserName, "test message")
 	setupLoggerExpectations(mockLogger, "outgoing", testPrivateChatID, testUserName, "response message")
 	mockAssistant.On("Ask", testUserName, "test message").Return("response message", nil)
 	mockSplitter.On("Split", "response message").Return([]string{"response message"}, nil)
 	mockBotAPI.On("Send", mock.Anything).Return(tgbotapi.Message{}, nil)
-	// Create bot and test update
-	bot := createTestBot(mockBotAPI, mockSplitter, mockLogger)
+
+	// Fix: Define the config variable here
+	config := createTestConfig()
+
+	bot := NewBotWithChunkStorage(mockBotAPI, config, mockSplitter, mockLogger, mockChunkStorage)
 	update := createMessageUpdate(testPrivateChatID, testUserName, "test message")
 	// Handle the update
 	bot.handleUpdate(update, mockAssistant)
@@ -323,14 +340,18 @@ func TestBot_handleUpdate_Success_GroupChat(t *testing.T) {
 	mockAssistant := new(MockAssistant)
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
+	mockChunkStorage := new(MockChunkStorage)
 	// Set up expectations
 	setupLoggerExpectations(mockLogger, "incoming", testGroupChatID2, testUserName, "testbot hello")
 	setupLoggerExpectations(mockLogger, "outgoing", testGroupChatID2, testUserName, "response message")
 	mockAssistant.On("Ask", testUserName, "hello").Return("response message", nil)
 	mockSplitter.On("Split", "response message").Return([]string{"response message"}, nil)
 	mockBotAPI.On("Send", mock.Anything).Return(tgbotapi.Message{}, nil)
-	// Create bot and test update
-	bot := createTestBot(mockBotAPI, mockSplitter, mockLogger)
+
+	// Fix: Define the config variable here
+	config := createTestConfig()
+
+	bot := NewBotWithChunkStorage(mockBotAPI, config, mockSplitter, mockLogger, mockChunkStorage)
 	update := createMessageUpdate(testGroupChatID2, testUserName, "testbot hello")
 	// Handle the update
 	bot.handleUpdate(update, mockAssistant)
@@ -340,12 +361,13 @@ func TestBot_handleUpdate_Success_GroupChat(t *testing.T) {
 	mockBotAPI.AssertExpectations(t)
 }
 
-// Tests for error handling
+// Fix the remaining test functions that use the undeclared 'config' variable
 func TestBot_handleUpdate_ParseError_GroupChatNoPrefix(t *testing.T) {
 	mockBotAPI := new(MockBotAPI)
 	mockAssistant := new(MockAssistant)
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
+	mockChunkStorage := new(MockChunkStorage)
 	// Set up expectations
 	setupLoggerExpectations(mockLogger, "incoming", testGroupChatID1, testUserName, "hello without prefix")
 	// Alternative approach for parse-error: set up the expectation directly
@@ -362,7 +384,11 @@ func TestBot_handleUpdate_ParseError_GroupChatNoPrefix(t *testing.T) {
 			args[5] != nil // Any error is fine
 	})).Return(nil)
 	// Create bot and test update
-	bot := createTestBot(mockBotAPI, mockSplitter, mockLogger)
+
+	// Fix: Define the config variable here
+	config := createTestConfig()
+
+	bot := NewBotWithChunkStorage(mockBotAPI, config, mockSplitter, mockLogger, mockChunkStorage)
 	update := createMessageUpdate(testGroupChatID1, testUserName, "hello without prefix")
 	// Handle the update
 	bot.handleUpdate(update, mockAssistant)
@@ -377,6 +403,7 @@ func TestBot_handleUpdate_ParseError(t *testing.T) {
 	mockAssistant := new(MockAssistant)
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
+	mockChunkStorage := new(MockChunkStorage)
 	// Set up expectations
 	setupLoggerExpectations(mockLogger, "incoming", testGroupChatID2, testUserName, "hello")
 	// Alternative approach for parse-error: set up the expectation directly
@@ -393,7 +420,16 @@ func TestBot_handleUpdate_ParseError(t *testing.T) {
 			args[5] != nil // Any error is fine
 	})).Return(nil)
 	// Create bot and test update
-	bot := createCustomBot(mockBotAPI, mockSplitter, mockLogger, true, []string{})
+
+	// Fix: Define the config variable here
+	config := BotConfig{
+		Name:        testBotName,
+		UserChats:   []string{}, // Empty user list to test parse error
+		GroupChats:  []int64{testGroupChatID1, testGroupChatID2},
+		UseShowMore: true,
+	}
+
+	bot := NewBotWithChunkStorage(mockBotAPI, config, mockSplitter, mockLogger, mockChunkStorage)
 	update := createMessageUpdate(testGroupChatID2, testUserName, "hello")
 	// Handle the update
 	bot.handleUpdate(update, mockAssistant)
@@ -408,6 +444,7 @@ func TestBot_handleUpdate_AskError_WithErrorMessage(t *testing.T) {
 	mockAssistant := new(MockAssistant)
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
+	mockChunkStorage := new(MockChunkStorage)
 	// Set up expectations
 	setupLoggerExpectations(mockLogger, "incoming", testPrivateChatID, testUserName, "test message")
 	mockLogger.On("Error", "Assistant error", []interface{}{
@@ -416,7 +453,11 @@ func TestBot_handleUpdate_AskError_WithErrorMessage(t *testing.T) {
 	mockAssistant.On("Ask", testUserName, "test message").Return("", assert.AnError)
 	setupMockForErrorResponse(mockBotAPI, ErrAssistantResponse)
 	// Create bot and test update
-	bot := createTestBot(mockBotAPI, mockSplitter, mockLogger)
+
+	// Fix: Define the config variable here
+	config := createTestConfig()
+
+	bot := NewBotWithChunkStorage(mockBotAPI, config, mockSplitter, mockLogger, mockChunkStorage)
 	update := createMessageUpdate(testPrivateChatID, testUserName, "test message")
 	// Handle the update
 	bot.handleUpdate(update, mockAssistant)
@@ -431,6 +472,7 @@ func TestBot_handleUpdate_SplitterError(t *testing.T) {
 	mockAssistant := new(MockAssistant)
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
+	mockChunkStorage := new(MockChunkStorage)
 	// Set up expectations
 	setupLoggerExpectations(mockLogger, "incoming", testPrivateChatID, testUserName, "test message")
 	mockLogger.On("Error", "Splitter error", []interface{}{
@@ -441,7 +483,11 @@ func TestBot_handleUpdate_SplitterError(t *testing.T) {
 	mockSplitter.On("Split", "response message").Return([]string{}, assert.AnError)
 	setupMockForErrorResponse(mockBotAPI, ErrSplittingResponse) // Fix: Changed from ErrSplitterResponse to ErrSplittingResponse
 	// Create bot and test update
-	bot := createTestBot(mockBotAPI, mockSplitter, mockLogger)
+
+	// Fix: Define the config variable here
+	config := createTestConfig()
+
+	bot := NewBotWithChunkStorage(mockBotAPI, config, mockSplitter, mockLogger, mockChunkStorage)
 	update := createMessageUpdate(testPrivateChatID, testUserName, "test message")
 	// Handle the update
 	bot.handleUpdate(update, mockAssistant)
@@ -456,6 +502,7 @@ func TestBot_handleUpdate_SendError(t *testing.T) {
 	mockAssistant := new(MockAssistant)
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
+	mockChunkStorage := new(MockChunkStorage)
 	// Set up expectations
 	setupLoggerExpectations(mockLogger, "incoming", testPrivateChatID, testUserName, "test message")
 	setupLoggerExpectations(mockLogger, "outgoing", testPrivateChatID, testUserName, "response message")
@@ -483,7 +530,11 @@ func TestBot_handleUpdate_SendError(t *testing.T) {
 	mockSplitter.On("Split", "response message").Return([]string{"response message"}, nil)
 	mockBotAPI.On("Send", mock.Anything).Return(tgbotapi.Message{}, assert.AnError)
 	// Create bot and test update
-	bot := createTestBot(mockBotAPI, mockSplitter, mockLogger)
+
+	// Fix: Define the config variable here
+	config := createTestConfig()
+
+	bot := NewBotWithChunkStorage(mockBotAPI, config, mockSplitter, mockLogger, mockChunkStorage)
 	update := createMessageUpdate(testPrivateChatID, testUserName, "test message")
 	// Handle the update
 	bot.handleUpdate(update, mockAssistant)
@@ -498,33 +549,29 @@ func TestBot_handleCallbackQuery(t *testing.T) {
 	mockBotAPI := new(MockBotAPI)
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
-	// Create a bot with pending chunks
-	config := BotConfig{
-		Name:        "testbot",
-		UserChats:   []string{"allowed_user"},
-		GroupChats:  []int64{12345, 67890},
-		UseShowMore: true,
-	}
-	bot := NewBot(mockBotAPI, config, mockSplitter, mockLogger)
-	// Set up pending chunks for test
-	bot.chunksMutex.Lock()
-	bot.pendingChunks["12345:testuser"] = &ChunkQueue{
-		Chunks:     []string{"chunk 1", "chunk 2", "chunk 3"},
-		Position:   1, // Already sent chunk 1
-		OriginalID: 100,
-	}
-	bot.chunksMutex.Unlock()
+	mockChunkStorage := new(MockChunkStorage)
+
+	// Mock the chunk storage to return the next chunk
+	mockChunkStorage.On("GetNextChunk", int64(12345), "testuser").
+		Return("chunk 2", 100, true, true)
+
 	// Mock expectations
 	// 1. Send the next chunk (chunk 2)
 	mockBotAPI.On("Send", mock.MatchedBy(func(c tgbotapi.Chattable) bool {
 		msg, ok := c.(tgbotapi.MessageConfig)
 		return ok && msg.Text == "chunk 2" && msg.ReplyMarkup != nil
 	})).Return(tgbotapi.Message{}, nil).Once()
+
 	// 2. Send callback acknowledgement
 	mockBotAPI.On("Send", mock.MatchedBy(func(c tgbotapi.Chattable) bool {
 		_, ok := c.(tgbotapi.CallbackConfig)
 		return ok
 	})).Return(tgbotapi.Message{}, nil).Once()
+
+	// Create bot and callback query
+	config := createTestConfig()
+	bot := NewBotWithChunkStorage(mockBotAPI, config, mockSplitter, mockLogger, mockChunkStorage)
+
 	// Create callback query
 	query := &tgbotapi.CallbackQuery{
 		ID: "callback123",
@@ -538,43 +585,32 @@ func TestBot_handleCallbackQuery(t *testing.T) {
 		},
 		Data: "show_more",
 	}
+
 	// Handle the callback
 	bot.handleCallbackQuery(query)
+
 	// Verify expectations
 	mockBotAPI.AssertExpectations(t)
-	// Check position was incremented
-	bot.chunksMutex.RLock()
-	position := bot.pendingChunks["12345:testuser"].Position
-	bot.chunksMutex.RUnlock()
-	assert.Equal(t, 2, position)
+	mockChunkStorage.AssertExpectations(t)
 }
 
 func TestBot_handleCallbackQuery_SendError(t *testing.T) {
 	mockBotAPI := new(MockBotAPI)
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
-	// Create a bot with pending chunks
-	config := BotConfig{
-		Name:        "testbot",
-		UserChats:   []string{"allowed_user"},
-		GroupChats:  []int64{12345, 67890},
-		UseShowMore: true,
-	}
-	bot := NewBot(mockBotAPI, config, mockSplitter, mockLogger)
-	// Set up pending chunks for test
-	bot.chunksMutex.Lock()
-	bot.pendingChunks["12345:testuser"] = &ChunkQueue{
-		Chunks:     []string{"chunk 1", "chunk 2", "chunk 3"},
-		Position:   1, // Already sent chunk 1
-		OriginalID: 100,
-	}
-	bot.chunksMutex.Unlock()
+	mockChunkStorage := new(MockChunkStorage)
+
+	// Mock the chunk storage to return the next chunk
+	mockChunkStorage.On("GetNextChunk", int64(12345), "testuser").
+		Return("chunk 2", 100, true, true)
+
 	// Expect error when sending chunk
 	mockBotAPI.On("Send", mock.MatchedBy(func(c tgbotapi.Chattable) bool {
 		msg, ok := c.(tgbotapi.MessageConfig)
 		return ok && msg.Text == "chunk 2"
 	})).Return(tgbotapi.Message{}, fmt.Errorf("send error")).Once()
-	// Expect error log - Fix: Use a matcher function instead of AnythingOfType
+
+	// Expect error log
 	mockLogger.On("Error", "Failed to send next chunk", mock.MatchedBy(func(args []interface{}) bool {
 		// Just check that we have the right keys
 		if len(args) != 4 {
@@ -592,16 +628,23 @@ func TestBot_handleCallbackQuery_SendError(t *testing.T) {
 		_, ok = args[1].(error)
 		return ok
 	})).Return(nil)
+
 	// Expect error message to user
 	mockBotAPI.On("Send", mock.MatchedBy(func(c tgbotapi.Chattable) bool {
 		msg, ok := c.(tgbotapi.MessageConfig)
 		return ok && strings.Contains(msg.Text, "Sorry, I couldn't load the next part")
 	})).Return(tgbotapi.Message{}, nil).Once()
+
 	// Expect callback response
 	mockBotAPI.On("Send", mock.MatchedBy(func(c tgbotapi.Chattable) bool {
 		cb, ok := c.(tgbotapi.CallbackConfig)
 		return ok && strings.Contains(cb.Text, "Failed to load more content")
 	})).Return(tgbotapi.Message{}, nil).Once()
+
+	// Create bot with mocked dependencies
+	config := createTestConfig()
+	bot := NewBotWithChunkStorage(mockBotAPI, config, mockSplitter, mockLogger, mockChunkStorage)
+
 	// Create callback query
 	query := &tgbotapi.CallbackQuery{
 		ID: "callback123",
@@ -615,40 +658,40 @@ func TestBot_handleCallbackQuery_SendError(t *testing.T) {
 		},
 		Data: "show_more",
 	}
+
 	// Handle the callback
 	bot.handleCallbackQuery(query)
+
 	// Verify expectations
 	mockBotAPI.AssertExpectations(t)
 	mockLogger.AssertExpectations(t)
+	mockChunkStorage.AssertExpectations(t)
 }
 
 // Tests for error message handling
 func TestBot_sendErrorMessage(t *testing.T) {
-	mockBotAPI := new(MockBotAPI)
-	mockSplitter := new(MockSplitter)
-	mockLogger := new(MockLogger)
+	// Replace the manual setup with the helper function
+	// Fix: Remove unused variables from the return values
+	bot, mockBotAPI, _, _, _, _ := setupTestBot(t)
+
 	// Expect an error message to be sent
 	mockBotAPI.On("Send", mock.MatchedBy(func(c tgbotapi.Chattable) bool {
 		msg, ok := c.(tgbotapi.MessageConfig)
 		return ok && msg.Text == "Test error message" && msg.ReplyToMessageID == 123
 	})).Return(tgbotapi.Message{}, nil).Once()
-	config := BotConfig{
-		Name:        "testbot",
-		UserChats:   []string{"allowed_user"},
-		GroupChats:  []int64{12345, 67890},
-		UseShowMore: true,
-	}
-	bot := NewBot(mockBotAPI, config, mockSplitter, mockLogger)
+
 	bot.sendErrorMessage(12345, 123, "Test error message")
 	mockBotAPI.AssertExpectations(t)
 }
 
 func TestBot_sendErrorMessage_Failure(t *testing.T) {
-	mockBotAPI := new(MockBotAPI)
-	mockSplitter := new(MockSplitter)
-	mockLogger := new(MockLogger)
+	// Replace the manual setup with the helper function
+	// Fix: Remove unused variables from the return values, keep mockLogger
+	bot, mockBotAPI, _, _, mockLogger, _ := setupTestBot(t)
+
 	// Expect an error when sending the message
 	mockBotAPI.On("Send", mock.Anything).Return(tgbotapi.Message{}, fmt.Errorf("failed to send message")).Once()
+
 	// Fix: Use a custom matcher for the error parameter
 	mockLogger.On("Error", "Failed to send error message", mock.MatchedBy(func(args []interface{}) bool {
 		// Just check that we have the right keys but allow any error value
@@ -667,13 +710,7 @@ func TestBot_sendErrorMessage_Failure(t *testing.T) {
 		_, ok = args[3].(error)
 		return ok
 	})).Return(nil)
-	config := BotConfig{
-		Name:        "testbot",
-		UserChats:   []string{"allowed_user"},
-		GroupChats:  []int64{12345, 67890},
-		UseShowMore: true,
-	}
-	bot := NewBot(mockBotAPI, config, mockSplitter, mockLogger)
+
 	bot.sendErrorMessage(12345, 123, "Test error message")
 	mockBotAPI.AssertExpectations(t)
 	mockLogger.AssertExpectations(t)
@@ -685,6 +722,7 @@ func TestBot_HandleMessages(t *testing.T) {
 	mockAssistant := new(MockAssistant)
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
+	mockChunkStorage := new(MockChunkStorage)
 	mockUpdates := make(chan tgbotapi.Update)
 	mockLogger.On("Info", "Incoming message", []interface{}{
 		"chat_id", int64(11111), "from_user", "testuser", "text", "test message",
@@ -700,13 +738,8 @@ func TestBot_HandleMessages(t *testing.T) {
 	mockSplitter.On("Split", "response message").Return([]string{"response message"}, nil)
 	mockBotAPI.On("Send", mock.Anything).Return(tgbotapi.Message{}, nil)
 
-	config := BotConfig{
-		Name:        "testbot",
-		UserChats:   []string{"testuser"},
-		GroupChats:  []int64{12345, 67890},
-		UseShowMore: true,
-	}
-	bot := NewBot(mockBotAPI, config, mockSplitter, mockLogger)
+	config := createTestConfig()
+	bot := NewBotWithChunkStorage(mockBotAPI, config, mockSplitter, mockLogger, mockChunkStorage)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -740,17 +773,44 @@ func TestBot_handleUpdate_NilMessage(t *testing.T) {
 	mockAssistant := new(MockAssistant)
 	mockSplitter := new(MockSplitter)
 	mockLogger := new(MockLogger)
+	mockChunkStorage := new(MockChunkStorage)
 	update := tgbotapi.Update{
 		Message: nil,
 	}
-	config := BotConfig{
-		Name:        "testbot",
-		UserChats:   []string{"allowed_user"},
-		GroupChats:  []int64{12345, 67890},
-		UseShowMore: true,
-	}
-	bot := NewBot(mockBotAPI, config, mockSplitter, mockLogger)
+	config := createTestConfig()
+	bot := NewBotWithChunkStorage(mockBotAPI, config, mockSplitter, mockLogger, mockChunkStorage)
 	bot.handleUpdate(update, mockAssistant)
 	mockAssistant.AssertExpectations(t)
 	mockBotAPI.AssertExpectations(t)
+}
+
+// Additional test for the Clear method in the InMemoryChunkStorage
+func TestInMemoryChunkStorage_Clear(t *testing.T) {
+	storage := NewInMemoryChunkStorage()
+
+	// Store chunks
+	storage.StoreChunks(12345, "testuser", 100, []string{"chunk1", "chunk2"})
+
+	// Verify chunks were stored
+	assert.True(t, storage.HasChunks(12345, "testuser"))
+
+	// Clear chunks
+	storage.Clear(12345, "testuser")
+
+	// Verify chunks were cleared
+	assert.False(t, storage.HasChunks(12345, "testuser"))
+}
+
+// Common setup function for tests with similar initialization
+func setupTestBot(t *testing.T) (*Bot, *MockBotAPI, *MockAssistant, *MockSplitter, *MockLogger, *MockChunkStorage) {
+	mockBotAPI := new(MockBotAPI)
+	mockAssistant := new(MockAssistant)
+	mockSplitter := new(MockSplitter)
+	mockLogger := new(MockLogger)
+	mockChunkStorage := new(MockChunkStorage)
+
+	config := createTestConfig()
+	bot := NewBotWithChunkStorage(mockBotAPI, config, mockSplitter, mockLogger, mockChunkStorage)
+
+	return bot, mockBotAPI, mockAssistant, mockSplitter, mockLogger, mockChunkStorage
 }
