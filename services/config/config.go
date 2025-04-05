@@ -20,7 +20,7 @@ type TelegramConfig struct {
 	Users        []string `env:"TELEGRAM_USER_CHATS" required:"true"`
 	Chats        []int64  `env:"TELEGRAM_GROUP_CHATS" required:"true"`
 	MessageLimit int      `env:"TELEGRAM_MESSAGE_LIMIT" required:"true"`
-	ShowMore     bool     `env:"TELEGRAM_SHOW_MORE" envDefault:"true"`
+	ShowMore     bool     `env:"TELEGRAM_SHOW_MORE" default:"true"`
 }
 
 type OpenAIConfig struct {
