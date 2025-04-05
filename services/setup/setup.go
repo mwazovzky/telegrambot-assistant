@@ -11,7 +11,6 @@ import (
 	"telegrambot-assistant/services/config"
 	"telegrambot-assistant/services/repository"
 	"telegrambot-assistant/services/storage"
-	"telegrambot-assistant/services/textsplitter"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/mwazovzky/assistant"
@@ -60,7 +59,6 @@ func InitLogger(cfg config.LokiConfig, service string) *cloudlog.Logger {
 	return cloudlog.NewLogger(client, service)
 }
 
-// Update InitBot to use the new Bot constructor with BotConfig
 func InitBot(cfg config.TelegramConfig, logger bot.Logger) (*bot.Bot, error) {
 	telegramBot, err := newBotAPI(cfg.ApiToken)
 	if err != nil {
@@ -69,14 +67,15 @@ func InitBot(cfg config.TelegramConfig, logger bot.Logger) (*bot.Bot, error) {
 
 	log.Printf("TelegramBot: authorized on account %s", telegramBot.Self.UserName)
 
-	splitter := textsplitter.NewTextSplitter(cfg.MessageLimit)
+	// Updated: Use BasicSplitter implementation
+	splitter := bot.NewBasicSplitter(cfg.MessageLimit)
 
 	// Create bot config struct
 	botConfig := bot.BotConfig{
 		Name:        cfg.BotName,
 		UserChats:   cfg.Users,
 		GroupChats:  cfg.Chats,
-		UseShowMore: cfg.ShowMore, // Updated to use the renamed field
+		UseShowMore: cfg.ShowMore,
 	}
 
 	return bot.NewBot(telegramBot, botConfig, splitter, logger), nil

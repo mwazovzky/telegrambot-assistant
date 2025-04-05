@@ -16,6 +16,22 @@ A Telegram bot that provides AI-powered assistance in private and group chats, l
 - **Persistent Context**: Conversation history stored in Redis
 - **Secure**: Access control for both private chats and groups
 
+## Internal Design
+
+The bot uses several components:
+
+- **Bot**: Main class that handles Telegram interactions
+- **Splitter**: Interface for text splitting with implementations:
+  - **BasicSplitter**: Line-based splitter for breaking long messages into chunks
+- **ChunkStorage**: Interface for storing and retrieving message chunks:
+  - **InMemoryChunkStorage**: Default implementation that stores chunks in memory
+  - Future implementations could include Redis or database storage
+- **Assistant**: Interfaces with the OpenAI API to generate responses
+
+### Scalability Considerations
+
+...
+
 ## Usage
 
 ### Private Chat

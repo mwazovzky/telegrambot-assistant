@@ -57,8 +57,15 @@ TelegramBot Assistant is a Telegram bot that provides AI-powered assistance in b
    - The bot must be configurable to either show the entire response at once or use incremental disclosure
 
 2. **Message Chunking**
+
    - The bot must split long responses into manageable chunks
    - The bot must maintain context between chunks of the same response
+   - The bot must reliably store message chunks for subsequent retrieval
+
+3. **Chunk Storage**
+   - The bot must provide resilient storage for message chunks
+   - The storage mechanism must support multiple concurrent conversations
+   - The storage interface must allow for future implementation of persistent storage
 
 ### Configuration
 
@@ -76,12 +83,19 @@ TelegramBot Assistant is a Telegram bot that provides AI-powered assistance in b
 1. The bot must respond within 5 seconds to user queries (excluding AI processing time)
 2. The bot must handle concurrent requests from multiple users
 3. The bot must maintain high availability (99.9% uptime)
+4. The bot must efficiently manage memory for storing message chunks
 
 ## Security Requirements
 
 1. The bot must securely store and handle API keys and tokens
 2. The bot must implement proper access controls for authorized users and groups
 3. The bot must log access attempts and usage patterns for security monitoring
+
+## Scalability Requirements
+
+1. The bot architecture must support horizontal scaling across multiple instances
+2. The bot must be able to migrate from in-memory storage to distributed storage
+3. The bot must implement resource limits to prevent memory exhaustion
 
 ## Future Considerations
 
@@ -90,3 +104,6 @@ TelegramBot Assistant is a Telegram bot that provides AI-powered assistance in b
 3. **Custom Commands** - User-defined commands and shortcuts
 4. **Multiple AI Models** - Support for different AI backends with varying capabilities
 5. **User Preferences** - Per-user configuration options
+6. **Improved Storage** - Enhanced message chunk storage with persistence and TTL
+7. **Redis Integration** - Support for Redis-backed chunk storage and rate limiting
+8. **Usage Analytics** - Collect and analyze conversation patterns and bot usage
