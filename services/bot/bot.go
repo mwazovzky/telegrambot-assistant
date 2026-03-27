@@ -144,6 +144,11 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) {
 		// Acknowledge the callback query
 		callback := tgbotapi.NewCallback(query.ID, "")
 		_, _ = b.botApi.Send(callback)
+
+		// Clean up chunk storage after all chunks have been delivered
+		if !hasMore {
+			b.chunkStorage.Clear(chatID, username)
+		}
 	}
 }
 

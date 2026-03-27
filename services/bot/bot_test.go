@@ -95,6 +95,10 @@ func (m *MockChunkStorage) HasChunks(chatID int64, username string) bool {
 	return args.Bool(0)
 }
 
+func (m *MockChunkStorage) Clear(chatID int64, username string) {
+	m.Called(chatID, username)
+}
+
 // Helper functions for tests
 func createTestBot(mockBotAPI BotAPI, mockSplitter Splitter, mockLogger Logger) *Bot {
 	config := BotConfig{

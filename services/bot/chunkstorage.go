@@ -16,6 +16,9 @@ type ChunkStorage interface {
 
 	// HasChunks checks if there are more chunks available for a conversation
 	HasChunks(chatID int64, username string) bool
+
+	// Clear removes all stored chunks for a conversation
+	Clear(chatID int64, username string)
 }
 
 // ChunkQueue maintains pending chunks for a specific conversation
