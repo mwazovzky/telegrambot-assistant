@@ -184,7 +184,7 @@ func (b *Bot) handleUpdate(update tgbotapi.Update, assistant Assistant) {
 		return
 	}
 
-	b.logger.Info(context.Background(), "Outgoing message", LogKeyChatID, msg.Chat.ID, LogKeyReplyToMsgID, msg.MessageID, LogKeyText, text, LogKeyChunksCount, len(chunks))
+	b.logger.Info(context.Background(), "Outgoing message", LogKeyChatID, msg.Chat.ID, LogKeyReplyToMsgID, msg.MessageID, LogKeyChunksCount, len(chunks))
 
 	err = b.send(msg.Chat.ID, msg.From.UserName, msg.MessageID, chunks)
 	if err != nil {

@@ -132,7 +132,7 @@ func setupLoggerExpectations(mockLogger *MockLogger, operation string, chatID in
 		}).Return(nil)
 	case "outgoing":
 		mockLogger.On("Info", "Outgoing message", []interface{}{
-			LogKeyChatID, chatID, LogKeyReplyToMsgID, 123, LogKeyText, text, LogKeyChunksCount, 1,
+			LogKeyChatID, chatID, LogKeyReplyToMsgID, 123, LogKeyChunksCount, 1,
 		}).Return(nil)
 	case "parse-error":
 		// Use mock.MatchedBy for the error parameter instead of a specific type
@@ -780,7 +780,7 @@ func TestBot_HandleMessages(t *testing.T) {
 
 	// Fix: Use reply_to_message_id of 0 to match actual code behavior
 	mockLogger.On("Info", "Outgoing message", []interface{}{
-		"chat_id", int64(11111), "reply_to_message_id", 0, "text", "response message", "chunks_count", 1,
+		"chat_id", int64(11111), "reply_to_message_id", 0, "chunks_count", 1,
 	}).Return(nil)
 
 	mockBotAPI.On("GetUpdatesChan", mock.Anything).Return((tgbotapi.UpdatesChannel)(mockUpdates))
