@@ -71,6 +71,38 @@ func TestBasicSplitter_Split_TrailingNewline(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
+func TestBasicSplitter_Split_BoundaryLengthLine(t *testing.T) {
+	// Line "abcde" (5 chars) + newline = 6, which equals the limit.
+	// Should produce a single chunk without overflow or empty chunks.
+	splitter := NewBasicSplitter(6)
+	input := "abcde"
+	expected := []string{
+		"abcde\n",
+	}
+	result, err := splitter.Split(input)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, result)
+
+	// Two boundary-length lines should produce two separate chunks, no empty chunks.
+	input = "abcde\n12345"
+	expected = []string{
+		"abcde\n",
+		"12345\n",
+	}
+	result, err = splitter.Split(input)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, result)
+}
+
+func TestBasicSplitter_LineExceedsLimitWithNewline(t *testing.T) {
+	// Line "abcdef" (6 chars) + newline = 7, which exceeds limit of 6.
+	splitter := NewBasicSplitter(6)
+	input := "abcdef"
+	result, err := splitter.Split(input)
+	assert.Nil(t, result)
+	assert.EqualError(t, err, "validation error: line exceeds limit")
+}
+
 func TestBasicSplitter_Split_Example(t *testing.T) {
 	// This test will need the example.txt file moved or path updated
 	t.Skip("Skipping example file test after moving to services/bot")
