@@ -128,7 +128,7 @@ func setupLoggerExpectations(mockLogger *MockLogger, operation string, chatID in
 	switch operation {
 	case "incoming":
 		mockLogger.On("Info", "Incoming message", []interface{}{
-			LogKeyChatID, chatID, LogKeyFromUser, username, LogKeyText, text,
+			LogKeyChatID, chatID, LogKeyFromUser, username,
 		}).Return(nil)
 	case "outgoing":
 		mockLogger.On("Info", "Outgoing message", []interface{}{
@@ -730,7 +730,7 @@ func TestBot_HandleMessages(t *testing.T) {
 	mockChunkStorage := new(MockChunkStorage)
 	mockUpdates := make(chan tgbotapi.Update)
 	mockLogger.On("Info", "Incoming message", []interface{}{
-		"chat_id", int64(11111), "from_user", "testuser", "text", "test message",
+		"chat_id", int64(11111), "from_user", "testuser",
 	}).Return(nil)
 
 	// Fix: Use reply_to_message_id of 0 to match actual code behavior

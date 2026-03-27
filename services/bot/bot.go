@@ -159,7 +159,7 @@ func (b *Bot) handleUpdate(update tgbotapi.Update, assistant Assistant) {
 		return
 	}
 
-	b.logger.Info(context.Background(), "Incoming message", LogKeyChatID, msg.Chat.ID, LogKeyFromUser, msg.From.UserName, LogKeyText, msg.Text)
+	b.logger.Info(context.Background(), "Incoming message", LogKeyChatID, msg.Chat.ID, LogKeyFromUser, msg.From.UserName)
 
 	req, err := b.parse(msg.Chat.ID, msg.From.UserName, msg.Text)
 	if err != nil {
