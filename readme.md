@@ -1,5 +1,4 @@
-![Tests](https://github.com/mwazovzky/telegrambot-assistant/actions/workflows/test.yml/badge.svg)
-![Docker Build](https://github.com/mwazovzky/telegrambot-assistant/actions/workflows/build-docker-image.yml/badge.svg)
+![CI](https://github.com/mwazovzky/telegrambot-assistant/actions/workflows/test.yml/badge.svg)
 
 # Telegram Bot Assistant
 
@@ -117,7 +116,7 @@ open coverage.html
 After a PR is merged into `main`:
 
 1. GitHub Actions automatically runs tests and builds a new Docker image (`mwazovzky/telegrambot-assistant:latest`) pushed to Docker Hub.
-2. Wait for the [docker-build](https://github.com/mwazovzky/telegrambot-assistant/actions/workflows/build-docker-image.yml) workflow to complete.
+2. Wait for the [CI](https://github.com/mwazovzky/telegrambot-assistant/actions/workflows/test.yml) workflow to complete.
 3. SSH into the production server and run:
 
 ```bash
