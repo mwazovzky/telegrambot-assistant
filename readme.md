@@ -25,12 +25,8 @@ The bot uses several components:
   - **BasicSplitter**: Line-based splitter for breaking long messages into chunks
 - **ChunkStorage**: Interface for storing and retrieving message chunks:
   - **InMemoryChunkStorage**: Default implementation that stores chunks in memory
-  - Future implementations could include Redis or database storage
 - **Assistant**: Interfaces with the OpenAI API to generate responses
 
-### Scalability Considerations
-
-...
 
 ## Usage
 
@@ -116,22 +112,23 @@ go test ./... -v
 open coverage.html
 ```
 
-### Building
-
-Create and push a Docker image:
-
-```bash
-# Build for production
-docker build --platform=linux/amd64 -t {username}/telegrambot-assistant .
-docker push {username}/telegrambot-assistant
-```
-
 ## Deployment
 
-Pull the latest image and deploy the application:
+After a PR is merged into `main`:
+
+1. GitHub Actions automatically runs tests and builds a new Docker image (`mwazovzky/telegrambot-assistant:latest`) pushed to Docker Hub.
+2. Wait for the [docker-build](https://github.com/mwazovzky/telegrambot-assistant/actions/workflows/build-docker-image.yml) workflow to complete.
+3. SSH into the production server and run:
 
 ```bash
+cd /path/to/telegrambot-assistant
 docker compose pull
 docker compose up -d --force-recreate
-docker image prune
+docker image prune -f
+```
+
+4. Verify the bot is running:
+
+```bash
+docker compose logs -f app
 ```
