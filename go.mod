@@ -6,7 +6,7 @@ require github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 
 require (
 	github.com/mwazovzky/assistant v0.1.2
-	github.com/mwazovzky/cloudlog v0.1.0
+	github.com/mwazovzky/cloudlog v1.3.0
 	github.com/mwazovzky/config v0.1.1
 	github.com/redis/go-redis/v9 v9.7.0
 	github.com/stretchr/testify v1.10.0

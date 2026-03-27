@@ -4,6 +4,7 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -61,17 +62,17 @@ type MockLogger struct {
 	mock.Mock
 }
 
-func (m *MockLogger) Info(message string, keyValues ...interface{}) error {
+func (m *MockLogger) Info(_ context.Context, message string, keyValues ...interface{}) error {
 	args := m.Called(message, keyValues)
 	return args.Error(0)
 }
 
-func (m *MockLogger) Error(message string, keyValues ...interface{}) error {
+func (m *MockLogger) Error(_ context.Context, message string, keyValues ...interface{}) error {
 	args := m.Called(message, keyValues)
 	return args.Error(0)
 }
 
-func (m *MockLogger) Debug(message string, keyValues ...interface{}) error {
+func (m *MockLogger) Debug(_ context.Context, message string, keyValues ...interface{}) error {
 	args := m.Called(message, keyValues)
 	return args.Error(0)
 }

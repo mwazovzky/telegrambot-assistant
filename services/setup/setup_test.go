@@ -1,6 +1,7 @@
 package setup
 
 import (
+	"context"
 	"testing"
 
 	"telegrambot-assistant/services/config"
@@ -20,17 +21,17 @@ type MockLogger struct {
 	mock.Mock
 }
 
-func (m *MockLogger) Info(message string, keyValues ...interface{}) error {
+func (m *MockLogger) Info(_ context.Context, message string, keyValues ...interface{}) error {
 	args := m.Called(message, keyValues)
 	return args.Error(0)
 }
 
-func (m *MockLogger) Error(message string, keyValues ...interface{}) error {
+func (m *MockLogger) Error(_ context.Context, message string, keyValues ...interface{}) error {
 	args := m.Called(message, keyValues)
 	return args.Error(0)
 }
 
-func (m *MockLogger) Debug(message string, keyValues ...interface{}) error {
+func (m *MockLogger) Debug(_ context.Context, message string, keyValues ...interface{}) error {
 	args := m.Called(message, keyValues)
 	return args.Error(0)
 }
@@ -91,7 +92,10 @@ func TestInitLogger(t *testing.T) {
 		Username: "test_user",
 		Token:    "test_token",
 	}
-	logger := InitLogger(cfg, "test_service")
+	resources := InitLogger(cfg, "test_service")
 
-	assert.NotNil(t, logger)
+	assert.NotNil(t, resources)
+	assert.NotNil(t, resources.Logger)
+	assert.NotNil(t, resources.Sender)
+	resources.Sender.Close()
 }

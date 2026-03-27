@@ -15,7 +15,8 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/mwazovzky/assistant"
 	openaiclient "github.com/mwazovzky/assistant/http/client"
-	"github.com/mwazovzky/cloudlog"
+	"github.com/mwazovzky/cloudlog/client"
+	"github.com/mwazovzky/cloudlog/logger"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -51,12 +52,24 @@ func InitAssistant(cfg config.OpenAIConfig, tr assistant.ThreadRepository) *assi
 	return assistant.NewAssistant(cfg.Model, role, client, tr)
 }
 
-func InitLogger(cfg config.LokiConfig, service string) *cloudlog.Logger {
+// LoggerResources holds the logger and async sender for graceful shutdown
+type LoggerResources struct {
+	Logger logger.Logger
+	Sender *logger.AsyncSender
+}
+
+func InitLogger(cfg config.LokiConfig, service string) *LoggerResources {
 	httpClient := &http.Client{
-		Timeout: 10 * time.Second, // Added timeout for HTTP client
+		Timeout: 10 * time.Second,
 	}
-	client := cloudlog.NewClient(cfg.Url, cfg.Username, cfg.Token, httpClient)
-	return cloudlog.NewLogger(client, service)
+	lokiClient := client.NewLokiClient(cfg.Url, cfg.Username, cfg.Token, httpClient)
+	sender := logger.NewAsyncSender(lokiClient)
+	log := logger.New(sender, logger.WithJob(service))
+
+	return &LoggerResources{
+		Logger: log,
+		Sender: sender,
+	}
 }
 
 func InitBot(cfg config.TelegramConfig, logger bot.Logger) (*bot.Bot, error) {
