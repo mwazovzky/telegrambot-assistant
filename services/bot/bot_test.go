@@ -594,7 +594,52 @@ func TestBot_handleCallbackQuery(t *testing.T) {
 	// Handle the callback
 	bot.handleCallbackQuery(query)
 
-	// Verify expectations
+	// Verify expectations - Clear should NOT be called when hasMore=true
+	mockBotAPI.AssertExpectations(t)
+	mockChunkStorage.AssertExpectations(t)
+	mockChunkStorage.AssertNotCalled(t, "Clear", mock.Anything, mock.Anything)
+}
+
+func TestBot_handleCallbackQuery_LastChunk(t *testing.T) {
+	mockBotAPI := new(MockBotAPI)
+	mockSplitter := new(MockSplitter)
+	mockLogger := new(MockLogger)
+	mockChunkStorage := new(MockChunkStorage)
+
+	// Mock the chunk storage to return the last chunk (hasMore=false)
+	mockChunkStorage.On("GetNextChunk", int64(12345), "testuser").
+		Return("chunk 3", 100, false, true)
+
+	// Expect Clear to be called after delivering the last chunk
+	mockChunkStorage.On("Clear", int64(12345), "testuser").Return()
+
+	// 1. Send the last chunk (no button)
+	mockBotAPI.On("Send", mock.MatchedBy(func(c tgbotapi.Chattable) bool {
+		msg, ok := c.(tgbotapi.MessageConfig)
+		return ok && msg.Text == "chunk 3" && msg.ReplyMarkup == nil
+	})).Return(tgbotapi.Message{}, nil).Once()
+
+	// 2. Send callback acknowledgement
+	mockBotAPI.On("Send", mock.MatchedBy(func(c tgbotapi.Chattable) bool {
+		_, ok := c.(tgbotapi.CallbackConfig)
+		return ok
+	})).Return(tgbotapi.Message{}, nil).Once()
+
+	config := createTestConfig()
+	bot := NewBotWithChunkStorage(mockBotAPI, config, mockSplitter, mockLogger, mockChunkStorage)
+
+	query := &tgbotapi.CallbackQuery{
+		ID:   "callback456",
+		From: &tgbotapi.User{UserName: "testuser"},
+		Message: &tgbotapi.Message{
+			Chat: &tgbotapi.Chat{ID: 12345},
+		},
+		Data: "show_more",
+	}
+
+	bot.handleCallbackQuery(query)
+
+	// Verify Clear was called
 	mockBotAPI.AssertExpectations(t)
 	mockChunkStorage.AssertExpectations(t)
 }
