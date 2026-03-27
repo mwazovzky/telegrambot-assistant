@@ -1,7 +1,6 @@
 package bot
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -103,15 +102,3 @@ func TestBasicSplitter_LineExceedsLimitWithNewline(t *testing.T) {
 	assert.EqualError(t, err, "validation error: line exceeds limit")
 }
 
-func TestBasicSplitter_Split_Example(t *testing.T) {
-	// This test will need the example.txt file moved or path updated
-	t.Skip("Skipping example file test after moving to services/bot")
-
-	data, err := os.ReadFile("example.txt")
-	assert.NoError(t, err)
-
-	splitter := NewBasicSplitter(300)
-	result, err := splitter.Split(string(data))
-	assert.NoError(t, err)
-	assert.NotNil(t, result)
-}
