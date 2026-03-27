@@ -1,6 +1,7 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strings"
@@ -44,9 +45,9 @@ type BotAPI interface {
 }
 
 type Logger interface {
-	Info(message string, keyValues ...interface{}) error
-	Error(message string, keyValues ...interface{}) error
-	Debug(message string, keyValues ...interface{}) error
+	Info(ctx context.Context, message string, keyValues ...interface{}) error
+	Error(ctx context.Context, message string, keyValues ...interface{}) error
+	Debug(ctx context.Context, message string, keyValues ...interface{}) error
 }
 
 type Bot struct {
@@ -129,7 +130,7 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) {
 
 		_, err := b.botApi.Send(msg)
 		if err != nil {
-			b.logger.Error("Failed to send next chunk", LogKeyError, err, LogKeyChatID, chatID)
+			b.logger.Error(context.Background(), "Failed to send next chunk", LogKeyError, err, LogKeyChatID, chatID)
 
 			// Send error message about the failure
 			errorMsg := tgbotapi.NewMessage(chatID, ErrLoadingNextPart)
@@ -144,6 +145,11 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) {
 		// Acknowledge the callback query
 		callback := tgbotapi.NewCallback(query.ID, "")
 		_, _ = b.botApi.Send(callback)
+
+		// Clean up chunk storage after all chunks have been delivered
+		if !hasMore {
+			b.chunkStorage.Clear(chatID, username)
+		}
 	}
 }
 
@@ -153,18 +159,18 @@ func (b *Bot) handleUpdate(update tgbotapi.Update, assistant Assistant) {
 		return
 	}
 
-	b.logger.Info("Incoming message", LogKeyChatID, msg.Chat.ID, LogKeyFromUser, msg.From.UserName, LogKeyText, msg.Text)
+	b.logger.Info(context.Background(), "Incoming message", LogKeyChatID, msg.Chat.ID, LogKeyFromUser, msg.From.UserName)
 
 	req, err := b.parse(msg.Chat.ID, msg.From.UserName, msg.Text)
 	if err != nil {
-		b.logger.Error("Parse error", LogKeyChatID, msg.Chat.ID, LogKeyFromUser, msg.From.UserName, LogKeyError, err)
+		b.logger.Error(context.Background(), "Parse error", LogKeyChatID, msg.Chat.ID, LogKeyFromUser, msg.From.UserName, LogKeyError, err)
 		// We don't send error feedback for parse errors to avoid responding to messages not intended for the bot
 		return
 	}
 
 	text, err := assistant.Ask(msg.From.UserName, req)
 	if err != nil {
-		b.logger.Error("Assistant error", LogKeyChatID, msg.Chat.ID, LogKeyFromUser, msg.From.UserName, LogKeyError, err)
+		b.logger.Error(context.Background(), "Assistant error", LogKeyChatID, msg.Chat.ID, LogKeyFromUser, msg.From.UserName, LogKeyError, err)
 		// Send error feedback to user
 		b.sendErrorMessage(msg.Chat.ID, msg.MessageID, ErrAssistantResponse)
 		return
@@ -172,17 +178,17 @@ func (b *Bot) handleUpdate(update tgbotapi.Update, assistant Assistant) {
 
 	chunks, err := b.splitter.Split(text)
 	if err != nil {
-		b.logger.Error("Splitter error", LogKeyChatID, msg.Chat.ID, LogKeyFromUser, msg.From.UserName, LogKeyError, err, LogKeyText, text, LogKeyChunks, chunks)
+		b.logger.Error(context.Background(), "Splitter error", LogKeyChatID, msg.Chat.ID, LogKeyFromUser, msg.From.UserName, LogKeyError, err, LogKeyText, text, LogKeyChunks, chunks)
 		// Send error feedback to user
 		b.sendErrorMessage(msg.Chat.ID, msg.MessageID, ErrSplittingResponse)
 		return
 	}
 
-	b.logger.Info("Outgoing message", LogKeyChatID, msg.Chat.ID, LogKeyReplyToMsgID, msg.MessageID, LogKeyText, text, LogKeyChunksCount, len(chunks))
+	b.logger.Info(context.Background(), "Outgoing message", LogKeyChatID, msg.Chat.ID, LogKeyReplyToMsgID, msg.MessageID, LogKeyText, text, LogKeyChunksCount, len(chunks))
 
 	err = b.send(msg.Chat.ID, msg.From.UserName, msg.MessageID, chunks)
 	if err != nil {
-		b.logger.Error("Send error", LogKeyChatID, msg.Chat.ID, LogKeyFromUser, msg.From.UserName, LogKeyError, err)
+		b.logger.Error(context.Background(), "Send error", LogKeyChatID, msg.Chat.ID, LogKeyFromUser, msg.From.UserName, LogKeyError, err)
 		// Send error feedback to user
 		b.sendErrorMessage(msg.Chat.ID, msg.MessageID, ErrSendingResponse)
 		return
@@ -197,7 +203,7 @@ func (b *Bot) sendErrorMessage(chatID int64, replyToID int, message string) {
 	// Try to send the error message, but don't worry if this also fails
 	_, err := b.botApi.Send(msg)
 	if err != nil {
-		b.logger.Error("Failed to send error message", LogKeyChatID, chatID, LogKeyError, err)
+		b.logger.Error(context.Background(), "Failed to send error message", LogKeyChatID, chatID, LogKeyError, err)
 	}
 }
 

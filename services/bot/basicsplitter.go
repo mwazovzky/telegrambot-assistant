@@ -30,11 +30,11 @@ func (s *BasicSplitter) Split(text string) ([]string, error) {
 	lines := strings.Split(text, newLine)
 
 	for _, line := range lines {
-		if len(line) > s.limit {
+		if len(line)+1 > s.limit {
 			return nil, fmt.Errorf("validation error: line exceeds limit")
 		}
 
-		if currentChunk.Len()+len(line)+1 > s.limit {
+		if currentChunk.Len()+len(line)+1 > s.limit && currentChunk.Len() > 0 {
 			chunks = append(chunks, currentChunk.String())
 			currentChunk.Reset()
 		}

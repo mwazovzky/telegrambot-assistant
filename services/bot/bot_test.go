@@ -4,6 +4,7 @@
 package bot
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -61,17 +62,17 @@ type MockLogger struct {
 	mock.Mock
 }
 
-func (m *MockLogger) Info(message string, keyValues ...interface{}) error {
+func (m *MockLogger) Info(_ context.Context, message string, keyValues ...interface{}) error {
 	args := m.Called(message, keyValues)
 	return args.Error(0)
 }
 
-func (m *MockLogger) Error(message string, keyValues ...interface{}) error {
+func (m *MockLogger) Error(_ context.Context, message string, keyValues ...interface{}) error {
 	args := m.Called(message, keyValues)
 	return args.Error(0)
 }
 
-func (m *MockLogger) Debug(message string, keyValues ...interface{}) error {
+func (m *MockLogger) Debug(_ context.Context, message string, keyValues ...interface{}) error {
 	args := m.Called(message, keyValues)
 	return args.Error(0)
 }
@@ -93,6 +94,10 @@ func (m *MockChunkStorage) GetNextChunk(chatID int64, username string) (chunk st
 func (m *MockChunkStorage) HasChunks(chatID int64, username string) bool {
 	args := m.Called(chatID, username)
 	return args.Bool(0)
+}
+
+func (m *MockChunkStorage) Clear(chatID int64, username string) {
+	m.Called(chatID, username)
 }
 
 // Helper functions for tests
@@ -123,7 +128,7 @@ func setupLoggerExpectations(mockLogger *MockLogger, operation string, chatID in
 	switch operation {
 	case "incoming":
 		mockLogger.On("Info", "Incoming message", []interface{}{
-			LogKeyChatID, chatID, LogKeyFromUser, username, LogKeyText, text,
+			LogKeyChatID, chatID, LogKeyFromUser, username,
 		}).Return(nil)
 	case "outgoing":
 		mockLogger.On("Info", "Outgoing message", []interface{}{
@@ -589,7 +594,52 @@ func TestBot_handleCallbackQuery(t *testing.T) {
 	// Handle the callback
 	bot.handleCallbackQuery(query)
 
-	// Verify expectations
+	// Verify expectations - Clear should NOT be called when hasMore=true
+	mockBotAPI.AssertExpectations(t)
+	mockChunkStorage.AssertExpectations(t)
+	mockChunkStorage.AssertNotCalled(t, "Clear", mock.Anything, mock.Anything)
+}
+
+func TestBot_handleCallbackQuery_LastChunk(t *testing.T) {
+	mockBotAPI := new(MockBotAPI)
+	mockSplitter := new(MockSplitter)
+	mockLogger := new(MockLogger)
+	mockChunkStorage := new(MockChunkStorage)
+
+	// Mock the chunk storage to return the last chunk (hasMore=false)
+	mockChunkStorage.On("GetNextChunk", int64(12345), "testuser").
+		Return("chunk 3", 100, false, true)
+
+	// Expect Clear to be called after delivering the last chunk
+	mockChunkStorage.On("Clear", int64(12345), "testuser").Return()
+
+	// 1. Send the last chunk (no button)
+	mockBotAPI.On("Send", mock.MatchedBy(func(c tgbotapi.Chattable) bool {
+		msg, ok := c.(tgbotapi.MessageConfig)
+		return ok && msg.Text == "chunk 3" && msg.ReplyMarkup == nil
+	})).Return(tgbotapi.Message{}, nil).Once()
+
+	// 2. Send callback acknowledgement
+	mockBotAPI.On("Send", mock.MatchedBy(func(c tgbotapi.Chattable) bool {
+		_, ok := c.(tgbotapi.CallbackConfig)
+		return ok
+	})).Return(tgbotapi.Message{}, nil).Once()
+
+	config := createTestConfig()
+	bot := NewBotWithChunkStorage(mockBotAPI, config, mockSplitter, mockLogger, mockChunkStorage)
+
+	query := &tgbotapi.CallbackQuery{
+		ID:   "callback456",
+		From: &tgbotapi.User{UserName: "testuser"},
+		Message: &tgbotapi.Message{
+			Chat: &tgbotapi.Chat{ID: 12345},
+		},
+		Data: "show_more",
+	}
+
+	bot.handleCallbackQuery(query)
+
+	// Verify Clear was called
 	mockBotAPI.AssertExpectations(t)
 	mockChunkStorage.AssertExpectations(t)
 }
@@ -725,7 +775,7 @@ func TestBot_HandleMessages(t *testing.T) {
 	mockChunkStorage := new(MockChunkStorage)
 	mockUpdates := make(chan tgbotapi.Update)
 	mockLogger.On("Info", "Incoming message", []interface{}{
-		"chat_id", int64(11111), "from_user", "testuser", "text", "test message",
+		"chat_id", int64(11111), "from_user", "testuser",
 	}).Return(nil)
 
 	// Fix: Use reply_to_message_id of 0 to match actual code behavior

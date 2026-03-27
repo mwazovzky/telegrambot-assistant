@@ -15,9 +15,10 @@ func main() {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	logger := setup.InitLogger(cfg.Loki, "telegram-assistant")
+	loggerResources := setup.InitLogger(cfg.Loki, "telegram-assistant")
+	defer loggerResources.Sender.Close()
 
-	bot, err := setup.InitBot(cfg.Telegram, logger)
+	bot, err := setup.InitBot(cfg.Telegram, loggerResources.Logger)
 	if err != nil {
 		log.Fatalf("Failed to initialize Telegram bot: %v", err)
 	}
@@ -28,19 +29,8 @@ func main() {
 	}
 
 	redisStorage := setup.InitStorage(redisClient, cfg.Redis.ExpirationTime)
-	if redisStorage == nil {
-		log.Fatal("Failed to initialize storage: invalid parameters")
-	}
-
 	threadRepo := setup.InitRepository(redisStorage)
-	if threadRepo == nil {
-		log.Fatalf("Failed to initialize repository: %v", err)
-	}
-
 	openAiAssistant := setup.InitAssistant(cfg.OpenAI, threadRepo)
-	if openAiAssistant == nil {
-		log.Fatalf("Failed to initialize OpenAI assistant: %v", err)
-	}
 
 	go bot.HandleMessages(openAiAssistant)
 
