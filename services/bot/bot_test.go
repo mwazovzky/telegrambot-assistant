@@ -45,8 +45,8 @@ type MockAssistant struct {
 	mock.Mock
 }
 
-func (m *MockAssistant) Ask(username string, request string) (string, error) {
-	args := m.Called(username, request)
+func (m *MockAssistant) Ask(userKey string, request string) (string, error) {
+	args := m.Called(userKey, request)
 	return args.String(0), args.Error(1)
 }
 

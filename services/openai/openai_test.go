@@ -55,6 +55,10 @@ func TestAssistant_Ask_NewConversation(t *testing.T) {
 	// No previous response ID — new conversation
 	mockStore.On("GetResponseID", "user1").Return("", fmt.Errorf("not found"))
 
+	// Expect log for store read failure
+	mockLogger := new(MockLogger)
+	mockLogger.On("Error", "Failed to get previous response ID", mock.Anything).Return(nil)
+
 	// Expect API call without PreviousResponseID
 	mockClient.On("New", mock.Anything, mock.MatchedBy(func(p responses.ResponseNewParams) bool {
 		return !p.PreviousResponseID.Valid()
@@ -65,7 +69,6 @@ func TestAssistant_Ask_NewConversation(t *testing.T) {
 	// Expect response ID stored
 	mockStore.On("SetResponseID", "user1", "resp_abc123").Return(nil)
 
-	mockLogger := new(MockLogger)
 	assistant := NewAssistant(mockClient, "gpt-4o-mini", "You are helpful.", mockStore, mockLogger, 30*time.Second)
 	result, err := assistant.Ask("user1", "Hello")
 
@@ -106,10 +109,12 @@ func TestAssistant_Ask_APIError(t *testing.T) {
 
 	mockStore.On("GetResponseID", "user1").Return("", fmt.Errorf("not found"))
 
+	mockLogger := new(MockLogger)
+	mockLogger.On("Error", "Failed to get previous response ID", mock.Anything).Return(nil)
+
 	mockClient.On("New", mock.Anything, mock.Anything).
 		Return((*responses.Response)(nil), fmt.Errorf("API rate limit exceeded"))
 
-	mockLogger := new(MockLogger)
 	assistant := NewAssistant(mockClient, "gpt-4o-mini", "You are helpful.", mockStore, mockLogger, 30*time.Second)
 	result, err := assistant.Ask("user1", "Hello")
 
@@ -125,14 +130,15 @@ func TestAssistant_Ask_StoreError(t *testing.T) {
 
 	mockStore.On("GetResponseID", "user1").Return("", fmt.Errorf("not found"))
 
+	mockLogger := new(MockLogger)
+	mockLogger.On("Error", "Failed to get previous response ID", mock.Anything).Return(nil)
+	mockLogger.On("Error", "Failed to store response ID", mock.Anything).Return(nil)
+
 	mockClient.On("New", mock.Anything, mock.Anything).
 		Return(&responses.Response{ID: "resp_abc"}, nil)
 
 	mockStore.On("SetResponseID", "user1", "resp_abc").
 		Return(fmt.Errorf("redis connection failed"))
-
-	mockLogger := new(MockLogger)
-	mockLogger.On("Error", "Failed to store response ID", mock.Anything).Return(nil)
 
 	assistant := NewAssistant(mockClient, "gpt-4o-mini", "You are helpful.", mockStore, mockLogger, 30*time.Second)
 	result, err := assistant.Ask("user1", "Hello")

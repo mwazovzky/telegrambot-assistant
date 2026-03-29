@@ -32,7 +32,7 @@ const (
 )
 
 type Assistant interface {
-	Ask(username string, request string) (response string, err error)
+	Ask(userKey string, request string) (response string, err error)
 }
 
 type Splitter interface {

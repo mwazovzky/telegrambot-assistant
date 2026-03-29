@@ -45,7 +45,7 @@ func NewAssistant(client ResponseClient, model string, instructions string, stor
 	}
 }
 
-func (a *Assistant) Ask(username string, request string) (string, error) {
+func (a *Assistant) Ask(userKey string, request string) (string, error) {
 	params := responses.ResponseNewParams{
 		Model:        shared.ResponsesModel(a.model),
 		Instructions: openai.String(a.instructions),
@@ -55,8 +55,11 @@ func (a *Assistant) Ask(username string, request string) (string, error) {
 	}
 
 	// Chain to previous response for conversation continuity
-	prevID, err := a.store.GetResponseID(username)
-	if err == nil && prevID != "" {
+	prevID, err := a.store.GetResponseID(userKey)
+	if err != nil {
+		// Log backend/store failures; proceed stateless
+		a.logger.Error(context.Background(), "Failed to get previous response ID", "user", userKey, "error", err)
+	} else if prevID != "" {
 		params.PreviousResponseID = openai.String(prevID)
 	}
 
@@ -70,8 +73,8 @@ func (a *Assistant) Ask(username string, request string) (string, error) {
 
 	// Store response ID for next turn; failure is non-fatal — the user
 	// still gets the response, but the next turn won't chain.
-	if err := a.store.SetResponseID(username, resp.ID); err != nil {
-		a.logger.Error(context.Background(), "Failed to store response ID", "user", username, "error", err)
+	if err := a.store.SetResponseID(userKey, resp.ID); err != nil {
+		a.logger.Error(context.Background(), "Failed to store response ID", "user", userKey, "error", err)
 	}
 
 	return resp.OutputText(), nil
