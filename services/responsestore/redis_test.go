@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -45,14 +46,27 @@ func TestRedisStore_GetResponseID(t *testing.T) {
 	mockClient.AssertExpectations(t)
 }
 
-func TestRedisStore_GetResponseID_NotFound(t *testing.T) {
+func TestRedisStore_GetResponseID_MissingKey(t *testing.T) {
 	mockClient := new(MockCacheClient)
-	mockClient.On("Get", "unknown").Return("", fmt.Errorf("key not found"))
+	mockClient.On("Get", "unknown").Return("", redis.Nil)
 
 	store := NewRedisStore(mockClient)
 	responseID, err := store.GetResponseID("unknown")
 
+	assert.NoError(t, err)
+	assert.Equal(t, "", responseID)
+	mockClient.AssertExpectations(t)
+}
+
+func TestRedisStore_GetResponseID_BackendError(t *testing.T) {
+	mockClient := new(MockCacheClient)
+	mockClient.On("Get", "user1").Return("", fmt.Errorf("connection refused"))
+
+	store := NewRedisStore(mockClient)
+	responseID, err := store.GetResponseID("user1")
+
 	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "connection refused")
 	assert.Equal(t, "", responseID)
 	mockClient.AssertExpectations(t)
 }

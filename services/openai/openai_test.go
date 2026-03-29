@@ -118,6 +118,8 @@ func TestAssistant_Ask_APIError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "openai response error")
 	assert.Equal(t, "", result)
+	mockClient.AssertExpectations(t)
+	mockStore.AssertExpectations(t)
 	mockStore.AssertNotCalled(t, "SetResponseID", mock.Anything, mock.Anything)
 }
 
@@ -141,6 +143,8 @@ func TestAssistant_Ask_StoreError(t *testing.T) {
 
 	// Store failure is non-fatal — response is still returned
 	assert.NoError(t, err)
-	mockLogger.AssertExpectations(t)
 	assert.Equal(t, "", result) // OutputText() returns empty for response without output items
+	mockClient.AssertExpectations(t)
+	mockStore.AssertExpectations(t)
+	mockLogger.AssertExpectations(t)
 }
