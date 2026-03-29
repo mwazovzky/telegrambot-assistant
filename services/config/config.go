@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/mwazovzky/config"
@@ -46,19 +45,8 @@ type LokiConfig struct {
 
 func Load() (*Config, error) {
 	cfg := &Config{}
-
-	if err := config.LoadConfig(&cfg.Telegram); err != nil {
-		return nil, fmt.Errorf("loading telegram config: %w", err)
+	if err := config.LoadConfig(cfg); err != nil {
+		return nil, err
 	}
-	if err := config.LoadConfig(&cfg.OpenAI); err != nil {
-		return nil, fmt.Errorf("loading openai config: %w", err)
-	}
-	if err := config.LoadConfig(&cfg.Redis); err != nil {
-		return nil, fmt.Errorf("loading redis config: %w", err)
-	}
-	if err := config.LoadConfig(&cfg.Loki); err != nil {
-		return nil, fmt.Errorf("loading loki config: %w", err)
-	}
-
 	return cfg, nil
 }
