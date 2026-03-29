@@ -1,4 +1,4 @@
-package repository
+package responsestore
 
 import (
 	"fmt"
@@ -22,35 +22,35 @@ func (m *MockCacheClient) Set(key string, value string) error {
 	return args.Error(0)
 }
 
-func TestCacheRepository_SetResponseID(t *testing.T) {
+func TestRedisStore_SetResponseID(t *testing.T) {
 	mockClient := new(MockCacheClient)
 	mockClient.On("Set", "user1", "resp_abc123").Return(nil)
 
-	repo := NewCachedRepository(mockClient)
-	err := repo.SetResponseID("user1", "resp_abc123")
+	store := NewRedisStore(mockClient)
+	err := store.SetResponseID("user1", "resp_abc123")
 
 	assert.NoError(t, err)
 	mockClient.AssertExpectations(t)
 }
 
-func TestCacheRepository_GetResponseID(t *testing.T) {
+func TestRedisStore_GetResponseID(t *testing.T) {
 	mockClient := new(MockCacheClient)
 	mockClient.On("Get", "user1").Return("resp_abc123", nil)
 
-	repo := NewCachedRepository(mockClient)
-	responseID, err := repo.GetResponseID("user1")
+	store := NewRedisStore(mockClient)
+	responseID, err := store.GetResponseID("user1")
 
 	assert.NoError(t, err)
 	assert.Equal(t, "resp_abc123", responseID)
 	mockClient.AssertExpectations(t)
 }
 
-func TestCacheRepository_GetResponseID_NotFound(t *testing.T) {
+func TestRedisStore_GetResponseID_NotFound(t *testing.T) {
 	mockClient := new(MockCacheClient)
 	mockClient.On("Get", "unknown").Return("", fmt.Errorf("key not found"))
 
-	repo := NewCachedRepository(mockClient)
-	responseID, err := repo.GetResponseID("unknown")
+	store := NewRedisStore(mockClient)
+	responseID, err := store.GetResponseID("unknown")
 
 	assert.Error(t, err)
 	assert.Equal(t, "", responseID)

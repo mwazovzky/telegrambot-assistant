@@ -1,4 +1,4 @@
-package repository
+package responsestore
 
 // ResponseStore stores and retrieves OpenAI response IDs for conversation continuity.
 type ResponseStore interface {

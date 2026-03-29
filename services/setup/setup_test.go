@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"telegrambot-assistant/services/config"
-	"telegrambot-assistant/services/repository"
+	"telegrambot-assistant/services/responsestore"
 	"telegrambot-assistant/services/storage"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -80,7 +80,7 @@ func TestInitAssistant(t *testing.T) {
 		Name:   "testName",
 		Role:   "testRole",
 	}
-	store := repository.NewInmemoryRepository()
+	store := responsestore.NewInmemoryStore()
 	mockLogger := new(MockLogger)
 	assistant := InitAssistant(cfg, store, mockLogger)
 	assert.NotNil(t, assistant)

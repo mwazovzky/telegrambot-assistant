@@ -10,7 +10,7 @@ import (
 	"telegrambot-assistant/services/bot"
 	"telegrambot-assistant/services/config"
 	localai "telegrambot-assistant/services/openai"
-	"telegrambot-assistant/services/repository"
+	"telegrambot-assistant/services/responsestore"
 	"telegrambot-assistant/services/storage"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -42,11 +42,11 @@ func InitStorage(r *redis.Client, ttl time.Duration) *storage.RedisService {
 	return storage.NewRedisService(r, ttl)
 }
 
-func InitResponseStore(client repository.CacheClient) *repository.CacheRepository {
-	return repository.NewCachedRepository(client)
+func InitResponseStore(client responsestore.CacheClient) *responsestore.RedisStore {
+	return responsestore.NewRedisStore(client)
 }
 
-func InitAssistant(cfg config.OpenAIConfig, store repository.ResponseStore, log localai.Logger) *localai.Assistant {
+func InitAssistant(cfg config.OpenAIConfig, store responsestore.ResponseStore, log localai.Logger) *localai.Assistant {
 	instructions := fmt.Sprintf("%s Your name is %s", cfg.Role, cfg.Name)
 	client := openai.NewClient(option.WithAPIKey(cfg.ApiKey))
 

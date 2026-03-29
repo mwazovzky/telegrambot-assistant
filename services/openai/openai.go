@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"telegrambot-assistant/services/repository"
+	"telegrambot-assistant/services/responsestore"
 
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
@@ -28,13 +28,13 @@ type Assistant struct {
 	client         ResponseClient
 	model          string
 	instructions   string
-	store          repository.ResponseStore
+	store          responsestore.ResponseStore
 	logger         Logger
 	requestTimeout time.Duration
 }
 
 // NewAssistant creates a new Assistant with the given dependencies.
-func NewAssistant(client ResponseClient, model string, instructions string, store repository.ResponseStore, logger Logger, requestTimeout time.Duration) *Assistant {
+func NewAssistant(client ResponseClient, model string, instructions string, store responsestore.ResponseStore, logger Logger, requestTimeout time.Duration) *Assistant {
 	return &Assistant{
 		client:         client,
 		model:          model,
