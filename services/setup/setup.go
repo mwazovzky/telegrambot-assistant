@@ -9,14 +9,15 @@ import (
 
 	"telegrambot-assistant/services/bot"
 	"telegrambot-assistant/services/config"
-	"telegrambot-assistant/services/repository"
+	localai "telegrambot-assistant/services/openai"
+	"telegrambot-assistant/services/responsestore"
 	"telegrambot-assistant/services/storage"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/mwazovzky/assistant"
-	openaiclient "github.com/mwazovzky/assistant/http/client"
 	"github.com/mwazovzky/cloudlog/client"
 	"github.com/mwazovzky/cloudlog/logger"
+	"github.com/openai/openai-go"
+	"github.com/openai/openai-go/option"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -41,15 +42,15 @@ func InitStorage(r *redis.Client, ttl time.Duration) *storage.RedisService {
 	return storage.NewRedisService(r, ttl)
 }
 
-func InitRepository(client repository.CacheClient) *repository.CacheRepository {
-	return repository.NewCachedRepository(client)
+func InitResponseStore(client responsestore.CacheClient) *responsestore.RedisStore {
+	return responsestore.NewRedisStore(client)
 }
 
-func InitAssistant(cfg config.OpenAIConfig, tr assistant.ThreadRepository) *assistant.Assistant {
-	role := fmt.Sprintf("%s Your name is %s", cfg.Role, cfg.Name)
-	client := openaiclient.NewOpenAiClient(cfg.ApiUrl, cfg.ApiKey)
+func InitAssistant(cfg config.OpenAIConfig, store responsestore.ResponseStore, log localai.Logger) *localai.Assistant {
+	instructions := fmt.Sprintf("%s Your name is %s", cfg.Role, cfg.Name)
+	client := openai.NewClient(option.WithAPIKey(cfg.ApiKey))
 
-	return assistant.NewAssistant(cfg.Model, role, client, tr)
+	return localai.NewAssistant(&client.Responses, cfg.Model, instructions, store, log, cfg.RequestTimeout)
 }
 
 // LoggerResources holds the logger and async sender for graceful shutdown

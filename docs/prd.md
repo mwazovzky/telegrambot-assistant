@@ -104,6 +104,4 @@ TelegramBot Assistant is a Telegram bot that provides AI-powered assistance in b
 3. **Custom Commands** - User-defined commands and shortcuts
 4. **Multiple AI Models** - Support for different AI backends with varying capabilities
 5. **User Preferences** - Per-user configuration options
-6. **Improved Storage** - Enhanced message chunk storage with persistence and TTL
-7. **Redis Integration** - Support for Redis-backed chunk storage and rate limiting
-8. **Usage Analytics** - Collect and analyze conversation patterns and bot usage
+6. **Usage Analytics** - Collect and analyze conversation patterns and bot usage

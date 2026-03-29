@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"telegrambot-assistant/services/config"
-	"telegrambot-assistant/services/repository"
+	"telegrambot-assistant/services/responsestore"
 	"telegrambot-assistant/services/storage"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -67,23 +67,23 @@ func TestInitBot(t *testing.T) {
 	assert.NotNil(t, bot)
 }
 
-func TestInitRepository(t *testing.T) {
+func TestInitResponseStore(t *testing.T) {
 	redisService := new(storage.RedisService)
-	repo := InitRepository(redisService)
-	assert.NotNil(t, repo)
+	store := InitResponseStore(redisService)
+	assert.NotNil(t, store)
 }
 
 func TestInitAssistant(t *testing.T) {
 	cfg := config.OpenAIConfig{
-		ApiUrl: "https://api.openai.com",
 		ApiKey: "testKey",
 		Model:  "testModel",
 		Name:   "testName",
 		Role:   "testRole",
 	}
-	tr := new(repository.ThreadRepository)
-	client := InitAssistant(cfg, *tr)
-	assert.NotNil(t, client)
+	store := responsestore.NewInmemoryStore()
+	mockLogger := new(MockLogger)
+	assistant := InitAssistant(cfg, store, mockLogger)
+	assert.NotNil(t, assistant)
 }
 
 func TestInitLogger(t *testing.T) {

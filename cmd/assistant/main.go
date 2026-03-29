@@ -29,8 +29,8 @@ func main() {
 	}
 
 	redisStorage := setup.InitStorage(redisClient, cfg.Redis.ExpirationTime)
-	threadRepo := setup.InitRepository(redisStorage)
-	openAiAssistant := setup.InitAssistant(cfg.OpenAI, threadRepo)
+	responseStore := setup.InitResponseStore(redisStorage)
+	openAiAssistant := setup.InitAssistant(cfg.OpenAI, responseStore, loggerResources.Logger)
 
 	go bot.HandleMessages(openAiAssistant)
 

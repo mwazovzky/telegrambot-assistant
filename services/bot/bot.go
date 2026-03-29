@@ -32,7 +32,7 @@ const (
 )
 
 type Assistant interface {
-	Ask(username string, request string) (response string, err error)
+	Ask(userKey string, request string) (response string, err error)
 }
 
 type Splitter interface {
@@ -168,7 +168,8 @@ func (b *Bot) handleUpdate(update tgbotapi.Update, assistant Assistant) {
 		return
 	}
 
-	text, err := assistant.Ask(msg.From.UserName, req)
+	userKey := fmt.Sprintf("%d", msg.From.ID)
+	text, err := assistant.Ask(userKey, req)
 	if err != nil {
 		b.logger.Error(context.Background(), "Assistant error", LogKeyChatID, msg.Chat.ID, LogKeyFromUser, msg.From.UserName, LogKeyError, err)
 		// Send error feedback to user
