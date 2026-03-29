@@ -12,8 +12,8 @@ github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1 h1:wG8n/XJQ07TmjbITcGi
 github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1/go.mod h1:A2S0CWkNylc2phvKXWBBdD3K0iGnDBGbzRpISP2zBl8=
 github.com/mwazovzky/cloudlog v1.3.0 h1:DBOEXM8W2enylu6q8ICyqIHymG/6b0V2ry5kk2B/rjw=
 github.com/mwazovzky/cloudlog v1.3.0/go.mod h1:ED2wvdL53IfYFGi+luS+LgWsSzp8XjZEOmNbbeyRRUA=
-github.com/mwazovzky/config v0.1.1 h1:8+Rv1S+AdVoZPc9XyyfnhKtWVTBOvqCm8OsQQZ7s1Jc=
-github.com/mwazovzky/config v0.1.1/go.mod h1:6lrgFuZh/jnDwJ4bPlUyCJcOP3XRk8PReJEGEXDK1SI=
+github.com/mwazovzky/config v0.2.0 h1:uCwvDXfrvJSql/OU34EA5SkVNQBts49+6x/RUgY+0g0=
+github.com/mwazovzky/config v0.2.0/go.mod h1:6lrgFuZh/jnDwJ4bPlUyCJcOP3XRk8PReJEGEXDK1SI=
 github.com/openai/openai-go v1.12.0 h1:NBQCnXzqOTv5wsgNC36PrFEiskGfO5wccfCWDo9S1U0=
 github.com/openai/openai-go v1.12.0/go.mod h1:g461MYGXEXBVdV5SaR/5tNzNbSfwTBBefwc+LlDCK0Y=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

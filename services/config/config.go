@@ -28,7 +28,7 @@ type OpenAIConfig struct {
 	Model          string        `env:"OPENAI_MODEL" required:"true"`
 	Name           string        `env:"OPENAI_ASSISTANT_NAME" required:"true"`
 	Role           string        `env:"OPENAI_ASSISTANT_ROLE" required:"true"`
-	RequestTimeout time.Duration `env:"OPENAI_REQUEST_TIMEOUT" default:"30"`
+	RequestTimeout time.Duration `env:"OPENAI_REQUEST_TIMEOUT" default:"30s"`
 }
 
 type RedisConfig struct {

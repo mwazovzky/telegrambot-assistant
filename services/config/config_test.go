@@ -49,7 +49,7 @@ func setupTestEnv() {
 	os.Setenv("REDIS_HOST", "localhost")
 	os.Setenv("REDIS_PORT", "6379")
 	os.Setenv("REDIS_PASSWORD", "test_password")
-	os.Setenv("REDIS_EXPIRATION_TIME", "60")
+	os.Setenv("REDIS_EXPIRATION_TIME", "60s")
 
 	os.Setenv("LOKI_URL", "http://localhost:3100")
 	os.Setenv("LOKI_USERNAME", "test_user")
@@ -74,7 +74,7 @@ func TestLoad(t *testing.T) {
 		"REDIS_HOST":             "localhost",
 		"REDIS_PORT":             "6379",
 		"REDIS_PASSWORD":         "test_password",
-		"REDIS_EXPIRATION_TIME":  "60",
+		"REDIS_EXPIRATION_TIME":  "60s",
 		"LOKI_URL":               "http://localhost:3100",
 		"LOKI_USERNAME":          "test_user",
 		"LOKI_AUTH_TOKEN":        "test_token",
@@ -104,7 +104,7 @@ func TestLoad(t *testing.T) {
 	assert.Equal(t, "localhost", cfg.Redis.Host)
 	assert.Equal(t, "6379", cfg.Redis.Port)
 	assert.Equal(t, "test_password", cfg.Redis.Password)
-	assert.Equal(t, time.Duration(60)*time.Second, cfg.Redis.ExpirationTime)
+	assert.Equal(t, 60*time.Second, cfg.Redis.ExpirationTime)
 }
 
 func TestLoadMissingRequired(t *testing.T) {
