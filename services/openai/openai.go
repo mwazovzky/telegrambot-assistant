@@ -35,6 +35,9 @@ type Assistant struct {
 
 // NewAssistant creates a new Assistant with the given dependencies.
 func NewAssistant(client ResponseClient, model string, instructions string, store responsestore.ResponseStore, logger Logger, requestTimeout time.Duration) *Assistant {
+	if requestTimeout <= 0 {
+		requestTimeout = 30 * time.Second
+	}
 	return &Assistant{
 		client:         client,
 		model:          model,
