@@ -20,6 +20,7 @@ const (
 	testBotName       = "testbot"
 	testUserName      = "testuser"
 	testAllowedUser   = "allowed_user"
+	testUserID        = int64(99999)
 	testPrivateChatID = int64(11111)
 	testGroupChatID1  = int64(12345)
 	testGroupChatID2  = int64(67890)
@@ -116,7 +117,7 @@ func createMessageUpdate(chatID int64, username, text string) tgbotapi.Update {
 	return tgbotapi.Update{
 		Message: &tgbotapi.Message{
 			Chat:      &tgbotapi.Chat{ID: chatID},
-			From:      &tgbotapi.User{UserName: username},
+			From:      &tgbotapi.User{ID: testUserID, UserName: username},
 			Text:      text,
 			MessageID: 123, // Use a consistent ID for simplicity
 		},
@@ -323,7 +324,7 @@ func TestBot_handleUpdate_Success(t *testing.T) {
 	// Set up expectations
 	setupLoggerExpectations(mockLogger, "incoming", testPrivateChatID, testUserName, "test message")
 	setupLoggerExpectations(mockLogger, "outgoing", testPrivateChatID, testUserName, "response message")
-	mockAssistant.On("Ask", testUserName, "test message").Return("response message", nil)
+	mockAssistant.On("Ask", fmt.Sprintf("%d", testUserID), "test message").Return("response message", nil)
 	mockSplitter.On("Split", "response message").Return([]string{"response message"}, nil)
 	mockBotAPI.On("Send", mock.Anything).Return(tgbotapi.Message{}, nil)
 
@@ -349,7 +350,7 @@ func TestBot_handleUpdate_Success_GroupChat(t *testing.T) {
 	// Set up expectations
 	setupLoggerExpectations(mockLogger, "incoming", testGroupChatID2, testUserName, "testbot hello")
 	setupLoggerExpectations(mockLogger, "outgoing", testGroupChatID2, testUserName, "response message")
-	mockAssistant.On("Ask", testUserName, "hello").Return("response message", nil)
+	mockAssistant.On("Ask", fmt.Sprintf("%d", testUserID), "hello").Return("response message", nil)
 	mockSplitter.On("Split", "response message").Return([]string{"response message"}, nil)
 	mockBotAPI.On("Send", mock.Anything).Return(tgbotapi.Message{}, nil)
 
@@ -455,7 +456,7 @@ func TestBot_handleUpdate_AskError_WithErrorMessage(t *testing.T) {
 	mockLogger.On("Error", "Assistant error", []interface{}{
 		LogKeyChatID, testPrivateChatID, LogKeyFromUser, testUserName, LogKeyError, assert.AnError,
 	}).Return(nil)
-	mockAssistant.On("Ask", testUserName, "test message").Return("", assert.AnError)
+	mockAssistant.On("Ask", fmt.Sprintf("%d", testUserID), "test message").Return("", assert.AnError)
 	setupMockForErrorResponse(mockBotAPI, ErrAssistantResponse)
 	// Create bot and test update
 
@@ -484,7 +485,7 @@ func TestBot_handleUpdate_SplitterError(t *testing.T) {
 		LogKeyChatID, testPrivateChatID, LogKeyFromUser, testUserName, LogKeyError, assert.AnError,
 		"text", "response message", "chunks", []string{},
 	}).Return(nil)
-	mockAssistant.On("Ask", testUserName, "test message").Return("response message", nil)
+	mockAssistant.On("Ask", fmt.Sprintf("%d", testUserID), "test message").Return("response message", nil)
 	mockSplitter.On("Split", "response message").Return([]string{}, assert.AnError)
 	setupMockForErrorResponse(mockBotAPI, ErrSplittingResponse) // Fix: Changed from ErrSplitterResponse to ErrSplittingResponse
 	// Create bot and test update
@@ -531,7 +532,7 @@ func TestBot_handleUpdate_SendError(t *testing.T) {
 		_, ok = args[3].(error)
 		return ok
 	})).Return(nil)
-	mockAssistant.On("Ask", testUserName, "test message").Return("response message", nil)
+	mockAssistant.On("Ask", fmt.Sprintf("%d", testUserID), "test message").Return("response message", nil)
 	mockSplitter.On("Split", "response message").Return([]string{"response message"}, nil)
 	mockBotAPI.On("Send", mock.Anything).Return(tgbotapi.Message{}, assert.AnError)
 	// Create bot and test update
@@ -784,7 +785,7 @@ func TestBot_HandleMessages(t *testing.T) {
 	}).Return(nil)
 
 	mockBotAPI.On("GetUpdatesChan", mock.Anything).Return((tgbotapi.UpdatesChannel)(mockUpdates))
-	mockAssistant.On("Ask", testUserName, "test message").Return("response message", nil)
+	mockAssistant.On("Ask", fmt.Sprintf("%d", testUserID), "test message").Return("response message", nil)
 	mockSplitter.On("Split", "response message").Return([]string{"response message"}, nil)
 	mockBotAPI.On("Send", mock.Anything).Return(tgbotapi.Message{}, nil)
 
@@ -803,9 +804,8 @@ func TestBot_HandleMessages(t *testing.T) {
 	mockUpdates <- tgbotapi.Update{
 		Message: &tgbotapi.Message{
 			Chat: &tgbotapi.Chat{ID: 11111},
-			From: &tgbotapi.User{UserName: "testuser"},
+			From: &tgbotapi.User{ID: testUserID, UserName: "testuser"},
 			Text: "test message",
-			// MessageID is not explicitly set, so it defaults to 0
 		},
 	}
 
