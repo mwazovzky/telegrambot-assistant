@@ -3,6 +3,7 @@ package openai
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"telegrambot-assistant/services/repository"
 
@@ -19,19 +20,21 @@ type ResponseClient interface {
 
 // Assistant implements bot.Assistant using the OpenAI Responses API.
 type Assistant struct {
-	client       ResponseClient
-	model        string
-	instructions string
-	store        repository.ResponseStore
+	client         ResponseClient
+	model          string
+	instructions   string
+	store          repository.ResponseStore
+	requestTimeout time.Duration
 }
 
 // NewAssistant creates a new Assistant with the given client, model, instructions, and store.
-func NewAssistant(client ResponseClient, model string, instructions string, store repository.ResponseStore) *Assistant {
+func NewAssistant(client ResponseClient, model string, instructions string, store repository.ResponseStore, requestTimeout time.Duration) *Assistant {
 	return &Assistant{
-		client:       client,
-		model:        model,
-		instructions: instructions,
-		store:        store,
+		client:         client,
+		model:          model,
+		instructions:   instructions,
+		store:          store,
+		requestTimeout: requestTimeout,
 	}
 }
 
@@ -50,7 +53,10 @@ func (a *Assistant) Ask(username string, request string) (string, error) {
 		params.PreviousResponseID = openai.String(prevID)
 	}
 
-	resp, err := a.client.New(context.Background(), params)
+	ctx, cancel := context.WithTimeout(context.Background(), a.requestTimeout)
+	defer cancel()
+
+	resp, err := a.client.New(ctx, params)
 	if err != nil {
 		return "", fmt.Errorf("openai response error: %w", err)
 	}

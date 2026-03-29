@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/openai/openai-go/option"
 	"github.com/openai/openai-go/responses"
@@ -52,7 +53,7 @@ func TestAssistant_Ask_NewConversation(t *testing.T) {
 	// Expect response ID stored
 	mockStore.On("SetResponseID", "user1", "resp_abc123").Return(nil)
 
-	assistant := NewAssistant(mockClient, "gpt-4o-mini", "You are helpful.", mockStore)
+	assistant := NewAssistant(mockClient, "gpt-4o-mini", "You are helpful.", mockStore, 30*time.Second)
 	result, err := assistant.Ask("user1", "Hello")
 
 	assert.NoError(t, err)
@@ -75,7 +76,7 @@ func TestAssistant_Ask_ContinuedConversation(t *testing.T) {
 
 	mockStore.On("SetResponseID", "user1", "resp_new").Return(nil)
 
-	assistant := NewAssistant(mockClient, "gpt-4o-mini", "You are helpful.", mockStore)
+	assistant := NewAssistant(mockClient, "gpt-4o-mini", "You are helpful.", mockStore, 30*time.Second)
 	_, err := assistant.Ask("user1", "Follow up question")
 
 	assert.NoError(t, err)
@@ -92,7 +93,7 @@ func TestAssistant_Ask_APIError(t *testing.T) {
 	mockClient.On("New", mock.Anything, mock.Anything).
 		Return((*responses.Response)(nil), fmt.Errorf("API rate limit exceeded"))
 
-	assistant := NewAssistant(mockClient, "gpt-4o-mini", "You are helpful.", mockStore)
+	assistant := NewAssistant(mockClient, "gpt-4o-mini", "You are helpful.", mockStore, 30*time.Second)
 	result, err := assistant.Ask("user1", "Hello")
 
 	assert.Error(t, err)
@@ -113,7 +114,7 @@ func TestAssistant_Ask_StoreError(t *testing.T) {
 	mockStore.On("SetResponseID", "user1", "resp_abc").
 		Return(fmt.Errorf("redis connection failed"))
 
-	assistant := NewAssistant(mockClient, "gpt-4o-mini", "You are helpful.", mockStore)
+	assistant := NewAssistant(mockClient, "gpt-4o-mini", "You are helpful.", mockStore, 30*time.Second)
 	result, err := assistant.Ask("user1", "Hello")
 
 	assert.Error(t, err)

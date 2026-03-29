@@ -24,10 +24,11 @@ type TelegramConfig struct {
 }
 
 type OpenAIConfig struct {
-	ApiKey string `env:"OPENAI_API_KEY" required:"true"`
-	Model  string `env:"OPENAI_MODEL" required:"true"`
-	Name   string `env:"OPENAI_ASSISTANT_NAME" required:"true"`
-	Role   string `env:"OPENAI_ASSISTANT_ROLE" required:"true"`
+	ApiKey         string        `env:"OPENAI_API_KEY" required:"true"`
+	Model          string        `env:"OPENAI_MODEL" required:"true"`
+	Name           string        `env:"OPENAI_ASSISTANT_NAME" required:"true"`
+	Role           string        `env:"OPENAI_ASSISTANT_ROLE" required:"true"`
+	RequestTimeout time.Duration `env:"OPENAI_REQUEST_TIMEOUT" default:"30"`
 }
 
 type RedisConfig struct {

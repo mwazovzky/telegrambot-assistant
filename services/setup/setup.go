@@ -50,7 +50,7 @@ func InitAssistant(cfg config.OpenAIConfig, store repository.ResponseStore) *loc
 	instructions := fmt.Sprintf("%s Your name is %s", cfg.Role, cfg.Name)
 	client := openai.NewClient(option.WithAPIKey(cfg.ApiKey))
 
-	return localai.NewAssistant(&client.Responses, cfg.Model, instructions, store)
+	return localai.NewAssistant(&client.Responses, cfg.Model, instructions, store, cfg.RequestTimeout)
 }
 
 // LoggerResources holds the logger and async sender for graceful shutdown
