@@ -1,12 +1,7 @@
 package repository
 
-import (
-	"github.com/mwazovzky/assistant"
-)
-
-type ThreadRepository interface {
-	ThreadExists(tid string) (bool, error)
-	CreateThread(tid string) error
-	AppendMessage(tid string, msg assistant.Message) error
-	GetMessages(tid string) ([]assistant.Message, error)
+// ResponseStore stores and retrieves OpenAI response IDs for conversation continuity.
+type ResponseStore interface {
+	GetResponseID(key string) (string, error)
+	SetResponseID(key string, responseID string) error
 }

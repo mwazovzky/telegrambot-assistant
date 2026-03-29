@@ -1,0 +1,122 @@
+package openai
+
+import (
+	"context"
+	"fmt"
+	"testing"
+
+	"github.com/openai/openai-go/option"
+	"github.com/openai/openai-go/responses"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+)
+
+// MockResponseClient mocks the OpenAI Responses API client.
+type MockResponseClient struct {
+	mock.Mock
+}
+
+func (m *MockResponseClient) New(ctx context.Context, params responses.ResponseNewParams, opts ...option.RequestOption) (*responses.Response, error) {
+	args := m.Called(ctx, params)
+	resp, _ := args.Get(0).(*responses.Response)
+	return resp, args.Error(1)
+}
+
+// MockResponseStore mocks the ResponseStore interface.
+type MockResponseStore struct {
+	mock.Mock
+}
+
+func (m *MockResponseStore) GetResponseID(key string) (string, error) {
+	args := m.Called(key)
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockResponseStore) SetResponseID(key string, responseID string) error {
+	args := m.Called(key, responseID)
+	return args.Error(0)
+}
+
+func TestAssistant_Ask_NewConversation(t *testing.T) {
+	mockClient := new(MockResponseClient)
+	mockStore := new(MockResponseStore)
+
+	// No previous response ID — new conversation
+	mockStore.On("GetResponseID", "user1").Return("", fmt.Errorf("not found"))
+
+	// Expect API call
+	mockClient.On("New", mock.Anything, mock.Anything).Return(&responses.Response{
+		ID: "resp_abc123",
+	}, nil)
+
+	// Expect response ID stored
+	mockStore.On("SetResponseID", "user1", "resp_abc123").Return(nil)
+
+	assistant := NewAssistant(mockClient, "gpt-4o-mini", "You are helpful.", mockStore)
+	result, err := assistant.Ask("user1", "Hello")
+
+	assert.NoError(t, err)
+	assert.Equal(t, "", result) // OutputText() returns empty for response without output items
+	mockClient.AssertExpectations(t)
+	mockStore.AssertExpectations(t)
+}
+
+func TestAssistant_Ask_ContinuedConversation(t *testing.T) {
+	mockClient := new(MockResponseClient)
+	mockStore := new(MockResponseStore)
+
+	// Previous response ID exists
+	mockStore.On("GetResponseID", "user1").Return("resp_previous", nil)
+
+	// Expect API call with PreviousResponseID set
+	mockClient.On("New", mock.Anything, mock.Anything).Return(&responses.Response{
+		ID: "resp_new",
+	}, nil)
+
+	mockStore.On("SetResponseID", "user1", "resp_new").Return(nil)
+
+	assistant := NewAssistant(mockClient, "gpt-4o-mini", "You are helpful.", mockStore)
+	_, err := assistant.Ask("user1", "Follow up question")
+
+	assert.NoError(t, err)
+	mockClient.AssertExpectations(t)
+	mockStore.AssertExpectations(t)
+}
+
+func TestAssistant_Ask_APIError(t *testing.T) {
+	mockClient := new(MockResponseClient)
+	mockStore := new(MockResponseStore)
+
+	mockStore.On("GetResponseID", "user1").Return("", fmt.Errorf("not found"))
+
+	mockClient.On("New", mock.Anything, mock.Anything).
+		Return((*responses.Response)(nil), fmt.Errorf("API rate limit exceeded"))
+
+	assistant := NewAssistant(mockClient, "gpt-4o-mini", "You are helpful.", mockStore)
+	result, err := assistant.Ask("user1", "Hello")
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "openai response error")
+	assert.Equal(t, "", result)
+	mockStore.AssertNotCalled(t, "SetResponseID", mock.Anything, mock.Anything)
+}
+
+func TestAssistant_Ask_StoreError(t *testing.T) {
+	mockClient := new(MockResponseClient)
+	mockStore := new(MockResponseStore)
+
+	mockStore.On("GetResponseID", "user1").Return("", fmt.Errorf("not found"))
+
+	mockClient.On("New", mock.Anything, mock.Anything).
+		Return(&responses.Response{ID: "resp_abc"}, nil)
+
+	mockStore.On("SetResponseID", "user1", "resp_abc").
+		Return(fmt.Errorf("redis connection failed"))
+
+	assistant := NewAssistant(mockClient, "gpt-4o-mini", "You are helpful.", mockStore)
+	result, err := assistant.Ask("user1", "Hello")
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to store response ID")
+	assert.Equal(t, "", result)
+}

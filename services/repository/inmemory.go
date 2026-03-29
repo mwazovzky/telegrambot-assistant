@@ -1,49 +1,25 @@
 package repository
 
-import (
-	"fmt"
+import "fmt"
 
-	openai "github.com/mwazovzky/assistant"
-)
-
+// InmemoryRepository implements ResponseStore using in-memory storage.
 type InmemoryRepository struct {
-	data map[string][]openai.Message
+	data map[string]string
 }
 
 func NewInmemoryRepository() *InmemoryRepository {
-	data := make(map[string][]openai.Message)
-	return &InmemoryRepository{data}
+	return &InmemoryRepository{data: make(map[string]string)}
 }
 
-func (tr *InmemoryRepository) ThreadExists(tid string) (bool, error) {
-	_, ok := tr.data[tid]
+func (r *InmemoryRepository) GetResponseID(key string) (string, error) {
+	value, ok := r.data[key]
 	if !ok {
-		return false, nil
+		return "", fmt.Errorf("key [%s] does not exist", key)
 	}
-
-	return true, nil
+	return value, nil
 }
 
-func (tr *InmemoryRepository) CreateThread(tid string) error {
-	tr.data[tid] = []openai.Message{}
+func (r *InmemoryRepository) SetResponseID(key string, responseID string) error {
+	r.data[key] = responseID
 	return nil
-}
-
-func (tr *InmemoryRepository) AppendMessage(tid string, msg openai.Message) error {
-	messages, ok := tr.data[tid]
-	if !ok {
-		return fmt.Errorf("thread [%s] does not exist", tid)
-	}
-
-	tr.data[tid] = append(messages, msg)
-	return nil
-}
-
-func (tr *InmemoryRepository) GetMessages(tid string) ([]openai.Message, error) {
-	messages, ok := tr.data[tid]
-	if !ok {
-		return nil, fmt.Errorf("thread [%s] does not exist", tid)
-	}
-
-	return messages, nil
 }

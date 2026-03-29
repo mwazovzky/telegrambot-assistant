@@ -24,7 +24,6 @@ type TelegramConfig struct {
 }
 
 type OpenAIConfig struct {
-	ApiUrl string `env:"OPENAI_API_URL" required:"true"`
 	ApiKey string `env:"OPENAI_API_KEY" required:"true"`
 	Model  string `env:"OPENAI_MODEL" required:"true"`
 	Name   string `env:"OPENAI_ASSISTANT_NAME" required:"true"`

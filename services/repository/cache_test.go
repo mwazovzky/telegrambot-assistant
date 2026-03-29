@@ -1,104 +1,58 @@
 package repository
 
 import (
+	"fmt"
 	"testing"
 
-	openai "github.com/mwazovzky/assistant"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-const success = "\u2713"
-const failure = "\u2717"
-
-var getStr = "[{\"role\":\"system\",\"content\":\"Assistant\"}]"
-var appendStr = "[{\"role\":\"system\",\"content\":\"Assistant\"},{\"role\":\"user\",\"content\":\"Question?\"}]"
-
-type MockRedisClient struct {
+type MockCacheClient struct {
 	mock.Mock
 }
 
-func (m *MockRedisClient) Exists(key string) (bool, error) {
-	args := m.Called(key)
-	return args.Bool(0), args.Error(1)
-}
-
-func (m *MockRedisClient) Get(key string) (string, error) {
+func (m *MockCacheClient) Get(key string) (string, error) {
 	args := m.Called(key)
 	return args.String(0), args.Error(1)
 }
 
-func (m *MockRedisClient) Set(key string, value string) error {
+func (m *MockCacheClient) Set(key string, value string) error {
 	args := m.Called(key, value)
 	return args.Error(0)
 }
 
-func TestCacheRepository_CreateThread(t *testing.T) {
-	mockRedis := new(MockRedisClient)
-	value, _ := encode([]openai.Message{})
-	mockRedis.On("Set", "myKey", value).Return(nil)
+func TestCacheRepository_SetResponseID(t *testing.T) {
+	mockClient := new(MockCacheClient)
+	mockClient.On("Set", "user1", "resp_abc123").Return(nil)
 
-	r := NewCachedRepository(mockRedis)
-	err := r.CreateThread("myKey")
+	repo := NewCachedRepository(mockClient)
+	err := repo.SetResponseID("user1", "resp_abc123")
 
-	if err == nil {
-		t.Logf("\t%s It should not return error.", success)
-	} else {
-		t.Fatalf("\t%s It should not return error, got [%s]", failure, err)
-	}
-
-	mockRedis.AssertExpectations(t)
+	assert.NoError(t, err)
+	mockClient.AssertExpectations(t)
 }
 
-func TestCacheRepository_GetMessages(t *testing.T) {
-	mockRedis := new(MockRedisClient)
-	mockRedis.On("Get", "myKey").Return(getStr, nil)
+func TestCacheRepository_GetResponseID(t *testing.T) {
+	mockClient := new(MockCacheClient)
+	mockClient.On("Get", "user1").Return("resp_abc123", nil)
 
-	r := NewCachedRepository(mockRedis)
-	messages, err := r.GetMessages("myKey")
+	repo := NewCachedRepository(mockClient)
+	responseID, err := repo.GetResponseID("user1")
 
-	if err == nil {
-		t.Logf("\t%s It should not return error.", success)
-	} else {
-		t.Fatalf("\t%s It should not return error, got [%s]", failure, err)
-	}
-
-	len := len(messages)
-	expectedLen := 1
-	if len == expectedLen {
-		t.Logf("\t%s It should contain %d message.", success, expectedLen)
-	} else {
-		t.Fatalf("\t%s It should contain %d message, got %d", failure, expectedLen, len)
-	}
-
-	msg := messages[0]
-	expectedMsg := openai.Message{Role: "system", Content: "Assistant"}
-	if compare(msg, expectedMsg) {
-		t.Logf("\t%s It should contain message %v.", success, expectedMsg)
-	} else {
-		t.Fatalf("\t%s It should contain message %v, got %v", failure, expectedMsg, msg)
-	}
-
-	mockRedis.AssertExpectations(t)
+	assert.NoError(t, err)
+	assert.Equal(t, "resp_abc123", responseID)
+	mockClient.AssertExpectations(t)
 }
 
-func TestCacheRepository_AppendMessage(t *testing.T) {
-	mockRedis := new(MockRedisClient)
-	mockRedis.On("Get", "myKey").Return(getStr, nil)
-	mockRedis.On("Set", "myKey", appendStr).Return(nil)
+func TestCacheRepository_GetResponseID_NotFound(t *testing.T) {
+	mockClient := new(MockCacheClient)
+	mockClient.On("Get", "unknown").Return("", fmt.Errorf("key not found"))
 
-	msg := openai.Message{Role: "user", Content: "Question?"}
-	r := NewCachedRepository(mockRedis)
-	err := r.AppendMessage("myKey", msg)
+	repo := NewCachedRepository(mockClient)
+	responseID, err := repo.GetResponseID("unknown")
 
-	if err == nil {
-		t.Logf("\t%s It should not return error.", success)
-	} else {
-		t.Fatalf("\t%s It should not return error, got [%s]", failure, err)
-	}
-
-	mockRedis.AssertExpectations(t)
-}
-
-func compare(one openai.Message, two openai.Message) bool {
-	return one.Role == two.Role && one.Content == two.Content
+	assert.Error(t, err)
+	assert.Equal(t, "", responseID)
+	mockClient.AssertExpectations(t)
 }

@@ -16,7 +16,6 @@ func clearTestEnv() {
 	os.Unsetenv("TELEGRAM_MESSAGE_LIMIT")
 	os.Unsetenv("TELEGRAM_SHOW_MORE")
 
-	os.Unsetenv("OPENAI_API_URL")
 	os.Unsetenv("OPENAI_API_KEY")
 	os.Unsetenv("OPENAI_MODEL")
 	os.Unsetenv("OPENAI_ASSISTANT_NAME")
@@ -42,7 +41,6 @@ func setupTestEnv() {
 	os.Setenv("TELEGRAM_MESSAGE_LIMIT", "4096")
 	os.Setenv("TELEGRAM_SHOW_MORE", "true")
 
-	os.Setenv("OPENAI_API_URL", "https://api.openai.com")
 	os.Setenv("OPENAI_API_KEY", "test_api_key")
 	os.Setenv("OPENAI_MODEL", "test_model")
 	os.Setenv("OPENAI_ASSISTANT_NAME", "test_assistant")
@@ -69,7 +67,6 @@ func TestLoad(t *testing.T) {
 		"TELEGRAM_USER_CHATS":    "user1,user2,user3",
 		"TELEGRAM_GROUP_CHATS":   "12345,67890",
 		"TELEGRAM_MESSAGE_LIMIT": "4096",
-		"OPENAI_API_URL":         "https://api.openai.com",
 		"OPENAI_API_KEY":         "test_api_key",
 		"OPENAI_MODEL":           "test_model",
 		"OPENAI_ASSISTANT_NAME":  "test_assistant",
@@ -99,7 +96,6 @@ func TestLoad(t *testing.T) {
 	assert.Equal(t, []int64{12345, 67890}, cfg.Telegram.Chats)
 	assert.Equal(t, 4096, cfg.Telegram.MessageLimit)
 
-	assert.Equal(t, "https://api.openai.com", cfg.OpenAI.ApiUrl)
 	assert.Equal(t, "test_api_key", cfg.OpenAI.ApiKey)
 	assert.Equal(t, "test_model", cfg.OpenAI.Model)
 	assert.Equal(t, "test_assistant", cfg.OpenAI.Name)

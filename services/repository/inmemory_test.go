@@ -3,7 +3,6 @@ package repository
 import (
 	"testing"
 
-	openai "github.com/mwazovzky/assistant"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,33 +12,36 @@ func TestNewInmemoryRepository(t *testing.T) {
 	assert.NotNil(t, repo.data)
 }
 
-func TestInmemoryRepository_CreateThread(t *testing.T) {
+func TestInmemoryRepository_SetResponseID(t *testing.T) {
 	repo := NewInmemoryRepository()
-	err := repo.CreateThread("testThread")
+	err := repo.SetResponseID("user1", "resp_abc123")
 	assert.NoError(t, err)
-	assert.Contains(t, repo.data, "testThread")
+	assert.Equal(t, "resp_abc123", repo.data["user1"])
 }
 
-func TestInmemoryRepository_AppendMessage(t *testing.T) {
+func TestInmemoryRepository_GetResponseID(t *testing.T) {
 	repo := NewInmemoryRepository()
-	repo.CreateThread("testThread")
+	repo.SetResponseID("user1", "resp_abc123")
 
-	msg := openai.Message{Role: "user", Content: "test message"}
-	err := repo.AppendMessage("testThread", msg)
+	responseID, err := repo.GetResponseID("user1")
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(repo.data["testThread"]))
-	assert.Equal(t, msg, repo.data["testThread"][0])
+	assert.Equal(t, "resp_abc123", responseID)
 }
 
-func TestInmemoryRepository_GetMessages(t *testing.T) {
+func TestInmemoryRepository_GetResponseID_NotFound(t *testing.T) {
 	repo := NewInmemoryRepository()
-	repo.CreateThread("testThread")
 
-	msg := openai.Message{Role: "user", Content: "test message"}
-	repo.AppendMessage("testThread", msg)
+	responseID, err := repo.GetResponseID("unknown")
+	assert.Error(t, err)
+	assert.Equal(t, "", responseID)
+}
 
-	messages, err := repo.GetMessages("testThread")
+func TestInmemoryRepository_SetResponseID_Overwrite(t *testing.T) {
+	repo := NewInmemoryRepository()
+	repo.SetResponseID("user1", "resp_first")
+	repo.SetResponseID("user1", "resp_second")
+
+	responseID, err := repo.GetResponseID("user1")
 	assert.NoError(t, err)
-	assert.Equal(t, 1, len(messages))
-	assert.Equal(t, msg, messages[0])
+	assert.Equal(t, "resp_second", responseID)
 }
