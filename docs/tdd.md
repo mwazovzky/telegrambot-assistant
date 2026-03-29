@@ -159,25 +159,26 @@ type ChunkStorage interface {
 
 ## Configuration Parameters
 
-| Parameter          | Environment Variable     | Default | Description                               |
-| ------------------ | ------------------------ | ------- | ----------------------------------------- |
-| Bot Name           | TELEGRAM_BOT_NAME        | -       | Bot's display name in Telegram            |
-| API Token          | TELEGRAM_API_TOKEN       | -       | Telegram Bot API token                    |
-| Authorized Users   | TELEGRAM_USER_CHATS      | -       | Comma-separated list of allowed users     |
-| Authorized Groups  | TELEGRAM_GROUP_CHATS     | -       | Comma-separated list of allowed group IDs |
-| Message Size Limit | TELEGRAM_MESSAGE_LIMIT   | -       | Maximum message size in characters        |
-| Show More Feature  | TELEGRAM_SHOW_MORE       | true    | Enable/disable Show More button feature   |
-| OpenAI API Key     | OPENAI_API_KEY           | -       | OpenAI API authentication key             |
-| OpenAI Model       | OPENAI_MODEL             | -       | Model to use (e.g. gpt-4o-mini)          |
-| Assistant Name     | OPENAI_ASSISTANT_NAME    | -       | Assistant's display name                  |
-| Assistant Role     | OPENAI_ASSISTANT_ROLE    | -       | System instructions for the assistant     |
-| Redis Host         | REDIS_HOST               | -       | Redis server hostname                     |
-| Redis Port         | REDIS_PORT               | -       | Redis server port                         |
-| Redis Password     | REDIS_PASSWORD           | -       | Redis authentication password             |
-| Redis TTL          | REDIS_EXPIRATION_TIME    | -       | TTL for stored response IDs               |
-| Loki URL           | LOKI_URL                 | -       | Loki logging endpoint                     |
-| Loki Username      | LOKI_USERNAME            | -       | Loki authentication username              |
-| Loki Token         | LOKI_AUTH_TOKEN          | -       | Loki authentication token                 |
+| Parameter              | Environment Variable     | Default | Description                                               |
+| ---------------------- | ------------------------ | ------- | --------------------------------------------------------- |
+| Bot Name               | TELEGRAM_BOT_NAME        | -       | Bot's display name in Telegram                            |
+| API Token              | TELEGRAM_API_TOKEN       | -       | Telegram Bot API token                                    |
+| Authorized Users       | TELEGRAM_USER_CHATS      | -       | Comma-separated list of allowed users                     |
+| Authorized Groups      | TELEGRAM_GROUP_CHATS     | -       | Comma-separated list of allowed group IDs                 |
+| Message Size Limit     | TELEGRAM_MESSAGE_LIMIT   | -       | Maximum message size in characters                        |
+| Show More Feature      | TELEGRAM_SHOW_MORE       | true    | Enable/disable Show More button feature                   |
+| OpenAI API Key         | OPENAI_API_KEY           | -       | OpenAI API authentication key                             |
+| OpenAI Model           | OPENAI_MODEL             | -       | Model to use (e.g. gpt-4o-mini)                           |
+| Assistant Name         | OPENAI_ASSISTANT_NAME    | -       | Assistant's display name                                  |
+| Assistant Role         | OPENAI_ASSISTANT_ROLE    | -       | System instructions for the assistant                     |
+| OpenAI Request Timeout | OPENAI_REQUEST_TIMEOUT   | 30s     | Timeout for OpenAI requests (duration, e.g. 30s, 1m, 2m) |
+| Redis Host             | REDIS_HOST               | -       | Redis server hostname                                     |
+| Redis Port             | REDIS_PORT               | -       | Redis server port                                         |
+| Redis Password         | REDIS_PASSWORD           | -       | Redis authentication password                             |
+| Redis TTL              | REDIS_EXPIRATION_TIME    | -       | TTL for stored response IDs                               |
+| Loki URL               | LOKI_URL                 | -       | Loki logging endpoint                                     |
+| Loki Username          | LOKI_USERNAME            | -       | Loki authentication username                              |
+| Loki Token             | LOKI_AUTH_TOKEN          | -       | Loki authentication token                                 |
 
 ## Error Handling
 
