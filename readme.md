@@ -71,6 +71,7 @@ OPENAI_API_KEY=your_openai_api_key
 OPENAI_MODEL=gpt-4o-mini
 OPENAI_ASSISTANT_NAME=Assistant
 OPENAI_ASSISTANT_ROLE="You are a helpful assistant."
+OPENAI_REQUEST_TIMEOUT=30s
 
 # Redis Configuration
 REDIS_HOST=localhost
