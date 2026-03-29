@@ -81,7 +81,8 @@ func TestInitAssistant(t *testing.T) {
 		Role:   "testRole",
 	}
 	store := repository.NewInmemoryRepository()
-	assistant := InitAssistant(cfg, store)
+	mockLogger := new(MockLogger)
+	assistant := InitAssistant(cfg, store, mockLogger)
 	assert.NotNil(t, assistant)
 }
 

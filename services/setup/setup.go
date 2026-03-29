@@ -46,11 +46,11 @@ func InitResponseStore(client repository.CacheClient) *repository.CacheRepositor
 	return repository.NewCachedRepository(client)
 }
 
-func InitAssistant(cfg config.OpenAIConfig, store repository.ResponseStore) *localai.Assistant {
+func InitAssistant(cfg config.OpenAIConfig, store repository.ResponseStore, log localai.Logger) *localai.Assistant {
 	instructions := fmt.Sprintf("%s Your name is %s", cfg.Role, cfg.Name)
 	client := openai.NewClient(option.WithAPIKey(cfg.ApiKey))
 
-	return localai.NewAssistant(&client.Responses, cfg.Model, instructions, store, cfg.RequestTimeout)
+	return localai.NewAssistant(&client.Responses, cfg.Model, instructions, store, log, cfg.RequestTimeout)
 }
 
 // LoggerResources holds the logger and async sender for graceful shutdown

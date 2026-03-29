@@ -38,6 +38,16 @@ func (m *MockResponseStore) SetResponseID(key string, responseID string) error {
 	return args.Error(0)
 }
 
+// MockLogger mocks the Logger interface.
+type MockLogger struct {
+	mock.Mock
+}
+
+func (m *MockLogger) Error(_ context.Context, message string, keyValues ...interface{}) error {
+	args := m.Called(message, keyValues)
+	return args.Error(0)
+}
+
 func TestAssistant_Ask_NewConversation(t *testing.T) {
 	mockClient := new(MockResponseClient)
 	mockStore := new(MockResponseStore)
@@ -53,7 +63,8 @@ func TestAssistant_Ask_NewConversation(t *testing.T) {
 	// Expect response ID stored
 	mockStore.On("SetResponseID", "user1", "resp_abc123").Return(nil)
 
-	assistant := NewAssistant(mockClient, "gpt-4o-mini", "You are helpful.", mockStore, 30*time.Second)
+	mockLogger := new(MockLogger)
+	assistant := NewAssistant(mockClient, "gpt-4o-mini", "You are helpful.", mockStore, mockLogger, 30*time.Second)
 	result, err := assistant.Ask("user1", "Hello")
 
 	assert.NoError(t, err)
@@ -76,7 +87,8 @@ func TestAssistant_Ask_ContinuedConversation(t *testing.T) {
 
 	mockStore.On("SetResponseID", "user1", "resp_new").Return(nil)
 
-	assistant := NewAssistant(mockClient, "gpt-4o-mini", "You are helpful.", mockStore, 30*time.Second)
+	mockLogger := new(MockLogger)
+	assistant := NewAssistant(mockClient, "gpt-4o-mini", "You are helpful.", mockStore, mockLogger, 30*time.Second)
 	_, err := assistant.Ask("user1", "Follow up question")
 
 	assert.NoError(t, err)
@@ -93,7 +105,8 @@ func TestAssistant_Ask_APIError(t *testing.T) {
 	mockClient.On("New", mock.Anything, mock.Anything).
 		Return((*responses.Response)(nil), fmt.Errorf("API rate limit exceeded"))
 
-	assistant := NewAssistant(mockClient, "gpt-4o-mini", "You are helpful.", mockStore, 30*time.Second)
+	mockLogger := new(MockLogger)
+	assistant := NewAssistant(mockClient, "gpt-4o-mini", "You are helpful.", mockStore, mockLogger, 30*time.Second)
 	result, err := assistant.Ask("user1", "Hello")
 
 	assert.Error(t, err)
@@ -114,10 +127,14 @@ func TestAssistant_Ask_StoreError(t *testing.T) {
 	mockStore.On("SetResponseID", "user1", "resp_abc").
 		Return(fmt.Errorf("redis connection failed"))
 
-	assistant := NewAssistant(mockClient, "gpt-4o-mini", "You are helpful.", mockStore, 30*time.Second)
+	mockLogger := new(MockLogger)
+	mockLogger.On("Error", "Failed to store response ID", mock.Anything).Return(nil)
+
+	assistant := NewAssistant(mockClient, "gpt-4o-mini", "You are helpful.", mockStore, mockLogger, 30*time.Second)
 	result, err := assistant.Ask("user1", "Hello")
 
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to store response ID")
-	assert.Equal(t, "", result)
+	// Store failure is non-fatal — response is still returned
+	assert.NoError(t, err)
+	mockLogger.AssertExpectations(t)
+	assert.Equal(t, "", result) // OutputText() returns empty for response without output items
 }
