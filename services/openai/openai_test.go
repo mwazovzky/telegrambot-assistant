@@ -55,8 +55,10 @@ func TestAssistant_Ask_NewConversation(t *testing.T) {
 	// No previous response ID — new conversation
 	mockStore.On("GetResponseID", "user1").Return("", fmt.Errorf("not found"))
 
-	// Expect API call
-	mockClient.On("New", mock.Anything, mock.Anything).Return(&responses.Response{
+	// Expect API call without PreviousResponseID
+	mockClient.On("New", mock.Anything, mock.MatchedBy(func(p responses.ResponseNewParams) bool {
+		return !p.PreviousResponseID.Valid()
+	})).Return(&responses.Response{
 		ID: "resp_abc123",
 	}, nil)
 
@@ -80,8 +82,10 @@ func TestAssistant_Ask_ContinuedConversation(t *testing.T) {
 	// Previous response ID exists
 	mockStore.On("GetResponseID", "user1").Return("resp_previous", nil)
 
-	// Expect API call with PreviousResponseID set
-	mockClient.On("New", mock.Anything, mock.Anything).Return(&responses.Response{
+	// Expect API call with PreviousResponseID set to the stored value
+	mockClient.On("New", mock.Anything, mock.MatchedBy(func(p responses.ResponseNewParams) bool {
+		return p.PreviousResponseID.Valid() && p.PreviousResponseID.Value == "resp_previous"
+	})).Return(&responses.Response{
 		ID: "resp_new",
 	}, nil)
 
