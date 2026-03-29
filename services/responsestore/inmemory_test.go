@@ -32,7 +32,7 @@ func TestInmemoryStore_GetResponseID_NotFound(t *testing.T) {
 	store := NewInmemoryStore()
 
 	responseID, err := store.GetResponseID("unknown")
-	assert.Error(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "", responseID)
 }
 

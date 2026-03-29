@@ -1,5 +1,7 @@
 package responsestore
 
+import "github.com/redis/go-redis/v9"
+
 // CacheClient defines the interface for key-value storage operations.
 type CacheClient interface {
 	Get(key string) (string, error)
@@ -16,7 +18,11 @@ func NewRedisStore(client CacheClient) *RedisStore {
 }
 
 func (r *RedisStore) GetResponseID(key string) (string, error) {
-	return r.client.Get(key)
+	val, err := r.client.Get(key)
+	if err == redis.Nil {
+		return "", nil
+	}
+	return val, err
 }
 
 func (r *RedisStore) SetResponseID(key string, responseID string) error {

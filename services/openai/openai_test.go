@@ -52,12 +52,10 @@ func TestAssistant_Ask_NewConversation(t *testing.T) {
 	mockClient := new(MockResponseClient)
 	mockStore := new(MockResponseStore)
 
-	// No previous response ID — new conversation
-	mockStore.On("GetResponseID", "user1").Return("", fmt.Errorf("not found"))
+	// No previous response ID — new conversation (returns "", nil)
+	mockStore.On("GetResponseID", "user1").Return("", nil)
 
-	// Expect log for store read failure
 	mockLogger := new(MockLogger)
-	mockLogger.On("Error", "Failed to get previous response ID", mock.Anything).Return(nil)
 
 	// Expect API call without PreviousResponseID
 	mockClient.On("New", mock.Anything, mock.MatchedBy(func(p responses.ResponseNewParams) bool {
@@ -107,10 +105,9 @@ func TestAssistant_Ask_APIError(t *testing.T) {
 	mockClient := new(MockResponseClient)
 	mockStore := new(MockResponseStore)
 
-	mockStore.On("GetResponseID", "user1").Return("", fmt.Errorf("not found"))
+	mockStore.On("GetResponseID", "user1").Return("", nil)
 
 	mockLogger := new(MockLogger)
-	mockLogger.On("Error", "Failed to get previous response ID", mock.Anything).Return(nil)
 
 	mockClient.On("New", mock.Anything, mock.Anything).
 		Return((*responses.Response)(nil), fmt.Errorf("API rate limit exceeded"))
@@ -128,10 +125,9 @@ func TestAssistant_Ask_StoreError(t *testing.T) {
 	mockClient := new(MockResponseClient)
 	mockStore := new(MockResponseStore)
 
-	mockStore.On("GetResponseID", "user1").Return("", fmt.Errorf("not found"))
+	mockStore.On("GetResponseID", "user1").Return("", nil)
 
 	mockLogger := new(MockLogger)
-	mockLogger.On("Error", "Failed to get previous response ID", mock.Anything).Return(nil)
 	mockLogger.On("Error", "Failed to store response ID", mock.Anything).Return(nil)
 
 	mockClient.On("New", mock.Anything, mock.Anything).
