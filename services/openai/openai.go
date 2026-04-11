@@ -7,7 +7,7 @@ import (
 
 	"telegrambot-assistant/services/responsestore"
 
-	"github.com/openai/openai-go"
+	ai "github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 	"github.com/openai/openai-go/responses"
 	"github.com/openai/openai-go/shared"
@@ -35,6 +35,9 @@ type Assistant struct {
 
 // NewAssistant creates a new Assistant with the given dependencies.
 func NewAssistant(client ResponseClient, model string, instructions string, store responsestore.ResponseStore, logger Logger, requestTimeout time.Duration) *Assistant {
+	if requestTimeout <= 0 {
+		requestTimeout = 30 * time.Second
+	}
 	return &Assistant{
 		client:         client,
 		model:          model,
@@ -48,9 +51,9 @@ func NewAssistant(client ResponseClient, model string, instructions string, stor
 func (a *Assistant) Ask(userKey string, request string) (string, error) {
 	params := responses.ResponseNewParams{
 		Model:        shared.ResponsesModel(a.model),
-		Instructions: openai.String(a.instructions),
+		Instructions: ai.String(a.instructions),
 		Input: responses.ResponseNewParamsInputUnion{
-			OfString: openai.String(request),
+			OfString: ai.String(request),
 		},
 	}
 
@@ -60,7 +63,7 @@ func (a *Assistant) Ask(userKey string, request string) (string, error) {
 		// Log backend/store failures; proceed stateless
 		a.logger.Error(context.Background(), "Failed to get previous response ID", "user", userKey, "error", err)
 	} else if prevID != "" {
-		params.PreviousResponseID = openai.String(prevID)
+		params.PreviousResponseID = ai.String(prevID)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), a.requestTimeout)
