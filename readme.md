@@ -79,6 +79,9 @@ REDIS_PORT=6379
 REDIS_PASSWORD=your_redis_password
 REDIS_EXPIRATION_TIME=24h
 
+# App logging
+LOG_LEVEL=INFO  # DEBUG, INFO, WARN, ERROR (default: INFO)
+
 # Loki/Grafana (consumed by the Promtail sidecar, not the app)
 LOKI_URL=https://logs-prod-025.grafana.net
 LOKI_USERNAME=your_loki_numeric_user_id

@@ -66,6 +66,7 @@ func TestInitBot(t *testing.T) {
 	bot, err := InitBot(cfg, mockLogger)
 	assert.NoError(t, err)
 	assert.NotNil(t, bot)
+	mockLogger.AssertExpectations(t)
 }
 
 func TestInitResponseStore(t *testing.T) {
