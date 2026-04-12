@@ -3,8 +3,6 @@ package setup
 import (
 	"context"
 	"fmt"
-	"log"
-	"net/http"
 	"time"
 
 	"telegrambot-assistant/services/bot"
@@ -14,8 +12,6 @@ import (
 	"telegrambot-assistant/services/storage"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/mwazovzky/cloudlog/client"
-	"github.com/mwazovzky/cloudlog/logger"
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 	"github.com/redis/go-redis/v9"
@@ -53,25 +49,6 @@ func InitAssistant(cfg config.OpenAIConfig, store responsestore.ResponseStore, l
 	return localai.NewAssistant(&client.Responses, cfg.Model, instructions, store, log, cfg.RequestTimeout)
 }
 
-// LoggerResources holds the logger and async sender for graceful shutdown
-type LoggerResources struct {
-	Logger logger.Logger
-	Sender *logger.AsyncSender
-}
-
-func InitLogger(cfg config.LokiConfig, service string) *LoggerResources {
-	httpClient := &http.Client{
-		Timeout: 10 * time.Second,
-	}
-	lokiClient := client.NewLokiClient(cfg.Url, cfg.Username, cfg.Token, httpClient)
-	sender := logger.NewAsyncSender(lokiClient)
-	log := logger.New(sender, logger.WithJob(service))
-
-	return &LoggerResources{
-		Logger: log,
-		Sender: sender,
-	}
-}
 
 func InitBot(cfg config.TelegramConfig, logger bot.Logger) (*bot.Bot, error) {
 	telegramBot, err := newBotAPI(cfg.ApiToken)
@@ -79,7 +56,7 @@ func InitBot(cfg config.TelegramConfig, logger bot.Logger) (*bot.Bot, error) {
 		return nil, fmt.Errorf("failed to create Telegram bot: %v", err)
 	}
 
-	log.Printf("TelegramBot: authorized on account %s", telegramBot.Self.UserName)
+	logger.Info(context.Background(), "TelegramBot: authorized on account", "username", telegramBot.Self.UserName)
 
 	// Updated: Use BasicSplitter implementation
 	splitter := bot.NewBasicSplitter(cfg.MessageLimit)

@@ -4,6 +4,11 @@ services:
     image: mwazovzky/telegrambot-assistant
     env_file:
       - .env
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   redis:
     container_name: redis
@@ -21,8 +26,22 @@ services:
       timeout: 10s
       retries: 5
 
+  promtail:
+    container_name: promtail
+    image: grafana/promtail:3.4.2
+    env_file:
+      - .env
+    volumes:
+      - ./promtail/config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - promtail_positions:/var/lib/promtail
+    command: -config.file=/etc/promtail/config.yml -config.expand-env=true
+    depends_on:
+      - app
+
 volumes:
   redis_data:
+  promtail_positions:
 
 networks:
   default:

@@ -62,9 +62,11 @@ func TestInitBot(t *testing.T) {
 		MessageLimit: 4096,                       // Added MessageLimit
 	}
 	mockLogger := new(MockLogger)
+	mockLogger.On("Info", "TelegramBot: authorized on account", []interface{}{"username", ""}).Return(nil)
 	bot, err := InitBot(cfg, mockLogger)
 	assert.NoError(t, err)
 	assert.NotNil(t, bot)
+	mockLogger.AssertExpectations(t)
 }
 
 func TestInitResponseStore(t *testing.T) {
@@ -86,16 +88,3 @@ func TestInitAssistant(t *testing.T) {
 	assert.NotNil(t, assistant)
 }
 
-func TestInitLogger(t *testing.T) {
-	cfg := config.LokiConfig{
-		Url:      "http://localhost:3100",
-		Username: "test_user",
-		Token:    "test_token",
-	}
-	resources := InitLogger(cfg, "test_service")
-
-	assert.NotNil(t, resources)
-	assert.NotNil(t, resources.Logger)
-	assert.NotNil(t, resources.Sender)
-	resources.Sender.Close()
-}

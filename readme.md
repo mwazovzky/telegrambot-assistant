@@ -79,9 +79,12 @@ REDIS_PORT=6379
 REDIS_PASSWORD=your_redis_password
 REDIS_EXPIRATION_TIME=24h
 
-# Loki Logging
-LOKI_URL=http://localhost:3100
-LOKI_USERNAME=loki
+# App logging
+LOG_LEVEL=INFO  # DEBUG, INFO, WARN, ERROR (default: INFO)
+
+# Loki/Grafana (consumed by the Promtail sidecar, not the app)
+LOKI_URL=https://logs-prod-025.grafana.net
+LOKI_USERNAME=your_loki_numeric_user_id
 LOKI_AUTH_TOKEN=your_loki_token
 ```
 
@@ -121,13 +124,17 @@ After a PR is merged into `main`:
 
 ```bash
 cd /path/to/telegrambot-assistant
+git pull
 docker compose pull
 docker compose up -d --force-recreate
 docker image prune -f
 ```
 
-4. Verify the bot is running:
+4. Verify the bot and log shipper are running:
 
 ```bash
-docker compose logs -f app
+docker compose logs -f app       # structured JSON log lines
+docker compose logs -f promtail  # log shipping activity to Loki
 ```
+
+> **Note:** The `promtail` sidecar ships `app` container logs to Grafana Cloud Loki. It reads `LOKI_URL`, `LOKI_USERNAME`, and `LOKI_AUTH_TOKEN` from `.env`. The app itself writes plain JSON to stdout — no direct Loki dependency in the application code.
