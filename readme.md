@@ -83,7 +83,7 @@ REDIS_EXPIRATION_TIME=24h
 LOG_LEVEL=INFO  # DEBUG, INFO, WARN, ERROR (default: INFO)
 
 # Loki/Grafana (consumed by the Promtail sidecar, not the app)
-LOKI_URL=https://logs-prod-025.grafana.net
+LOKI_URL=https://logs-prod-025.grafana.net/loki/api/v1/push
 LOKI_USERNAME=your_loki_numeric_user_id
 LOKI_AUTH_TOKEN=your_loki_token
 ```
@@ -124,7 +124,6 @@ After a PR is merged into `main`:
 
 ```bash
 cd /path/to/telegrambot-assistant
-git pull
 docker compose pull
 docker compose up -d --force-recreate
 docker image prune -f
