@@ -5,8 +5,8 @@ go 1.23.0
 require github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 
 require (
+	github.com/caarlos0/env/v11 v11.4.0
 	github.com/mwazovzky/cloudlog v1.3.0
-	github.com/mwazovzky/config v0.2.0
 	github.com/openai/openai-go v1.12.0
 	github.com/redis/go-redis/v9 v9.7.0
 	github.com/stretchr/testify v1.10.0
