@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"context"
 	"os"
 	"os/signal"
 	"syscall"
@@ -11,21 +11,25 @@ import (
 )
 
 func main() {
+	appLogger := logger.New()
+	ctx := context.Background()
+
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		appLogger.Error(ctx, "Failed to load configuration", "error", err)
+		os.Exit(1)
 	}
-
-	appLogger := logger.New()
 
 	bot, err := setup.InitBot(cfg.Telegram, appLogger)
 	if err != nil {
-		log.Fatalf("Failed to initialize Telegram bot: %v", err)
+		appLogger.Error(ctx, "Failed to initialize Telegram bot", "error", err)
+		os.Exit(1)
 	}
 
 	redisClient, err := setup.InitRedis(cfg.Redis)
 	if err != nil {
-		log.Fatalf("Failed to initialize Redis: %v", err)
+		appLogger.Error(ctx, "Failed to initialize Redis", "error", err)
+		os.Exit(1)
 	}
 
 	redisStorage := setup.InitStorage(redisClient, cfg.Redis.ExpirationTime)
@@ -34,12 +38,11 @@ func main() {
 
 	go bot.HandleMessages(openAiAssistant)
 
-	log.Println("Assistant service started...")
+	appLogger.Info(ctx, "Assistant service started")
 
-	// Wait for termination signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
 	<-quit
 
-	log.Println("Shutting down assistant service...")
+	appLogger.Info(ctx, "Shutting down assistant service")
 }
