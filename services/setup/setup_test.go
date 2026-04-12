@@ -62,6 +62,7 @@ func TestInitBot(t *testing.T) {
 		MessageLimit: 4096,                       // Added MessageLimit
 	}
 	mockLogger := new(MockLogger)
+	mockLogger.On("Info", "TelegramBot: authorized on account", []interface{}{"username", ""}).Return(nil)
 	bot, err := InitBot(cfg, mockLogger)
 	assert.NoError(t, err)
 	assert.NotNil(t, bot)

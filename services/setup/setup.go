@@ -3,7 +3,6 @@ package setup
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"telegrambot-assistant/services/bot"
@@ -57,7 +56,7 @@ func InitBot(cfg config.TelegramConfig, logger bot.Logger) (*bot.Bot, error) {
 		return nil, fmt.Errorf("failed to create Telegram bot: %v", err)
 	}
 
-	log.Printf("TelegramBot: authorized on account %s", telegramBot.Self.UserName)
+	logger.Info(context.Background(), "TelegramBot: authorized on account", "username", telegramBot.Self.UserName)
 
 	// Updated: Use BasicSplitter implementation
 	splitter := bot.NewBasicSplitter(cfg.MessageLimit)
