@@ -10,7 +10,6 @@ type Config struct {
 	Telegram TelegramConfig
 	OpenAI   OpenAIConfig
 	Redis    RedisConfig
-	Loki     LokiConfig
 }
 
 type TelegramConfig struct {
@@ -35,12 +34,6 @@ type RedisConfig struct {
 	Port           string        `env:"REDIS_PORT,required"`
 	Password       string        `env:"REDIS_PASSWORD,required"`
 	ExpirationTime time.Duration `env:"REDIS_EXPIRATION_TIME,required"`
-}
-
-type LokiConfig struct {
-	Url      string `env:"LOKI_URL,required"`
-	Username string `env:"LOKI_USERNAME,required"`
-	Token    string `env:"LOKI_AUTH_TOKEN,required"`
 }
 
 func Load() (*Config, error) {

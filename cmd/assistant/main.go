@@ -6,6 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 	"telegrambot-assistant/services/config"
+	"telegrambot-assistant/services/logger"
 	"telegrambot-assistant/services/setup"
 )
 
@@ -15,10 +16,9 @@ func main() {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	loggerResources := setup.InitLogger(cfg.Loki, "telegram-assistant")
-	defer loggerResources.Sender.Close()
+	appLogger := logger.New()
 
-	bot, err := setup.InitBot(cfg.Telegram, loggerResources.Logger)
+	bot, err := setup.InitBot(cfg.Telegram, appLogger)
 	if err != nil {
 		log.Fatalf("Failed to initialize Telegram bot: %v", err)
 	}
@@ -30,7 +30,7 @@ func main() {
 
 	redisStorage := setup.InitStorage(redisClient, cfg.Redis.ExpirationTime)
 	responseStore := setup.InitResponseStore(redisStorage)
-	openAiAssistant := setup.InitAssistant(cfg.OpenAI, responseStore, loggerResources.Logger)
+	openAiAssistant := setup.InitAssistant(cfg.OpenAI, responseStore, appLogger)
 
 	go bot.HandleMessages(openAiAssistant)
 

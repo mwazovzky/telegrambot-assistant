@@ -26,9 +26,6 @@ func clearTestEnv() {
 	os.Unsetenv("REDIS_PASSWORD")
 	os.Unsetenv("REDIS_EXPIRATION_TIME")
 
-	os.Unsetenv("LOKI_URL")
-	os.Unsetenv("LOKI_USERNAME")
-	os.Unsetenv("LOKI_AUTH_TOKEN")
 }
 
 func setupTestEnv() {
@@ -51,9 +48,6 @@ func setupTestEnv() {
 	os.Setenv("REDIS_PASSWORD", "test_password")
 	os.Setenv("REDIS_EXPIRATION_TIME", "60s")
 
-	os.Setenv("LOKI_URL", "http://localhost:3100")
-	os.Setenv("LOKI_USERNAME", "test_user")
-	os.Setenv("LOKI_AUTH_TOKEN", "test_token")
 }
 
 func TestLoad(t *testing.T) {
@@ -75,9 +69,6 @@ func TestLoad(t *testing.T) {
 		"REDIS_PORT":             "6379",
 		"REDIS_PASSWORD":         "test_password",
 		"REDIS_EXPIRATION_TIME":  "60s",
-		"LOKI_URL":               "http://localhost:3100",
-		"LOKI_USERNAME":          "test_user",
-		"LOKI_AUTH_TOKEN":        "test_token",
 	}
 
 	for k, v := range env {
